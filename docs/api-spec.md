@@ -102,6 +102,24 @@ Registers a user as a member of a room. Required before subscribing or sending m
     - `404 Not Found`: `ROOM_NOT_FOUND` (Target room does not exist).
     - `400 Bad Request`: `ALREADY_MEMBER` (User is already a member of this room).
 
+### Upload Media Attachment
+Uploads a file or image to be attached to a message.
+*   **Route**: `POST /media/upload`
+*   **Authentication**: Required (Valid Access Token)
+*   **Request Format**: `multipart/form-data`
+    - `file` (MultipartFile, required): Max size 10MB.
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "fileName": "attachment.png",
+      "fileUrl": "/uploads/attachment-a0eebc99-9c0b.png",
+      "fileType": "image/png",
+      "fileSize": 1048576
+    }
+    ```
+*   **Errors**:
+    - `400 Bad Request`: `BAD_REQUEST` (File size exceeds limit or unsupported file type).
+
 ### Fetch Message History (Paginated)
 Retrieves historical messages for a room, ordered by creation date descending.
 *   **Route**: `GET /rooms/{roomId}/messages`

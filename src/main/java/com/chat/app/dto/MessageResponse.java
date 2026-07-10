@@ -19,5 +19,6 @@ public class MessageResponse {
     private UUID senderId;
     private String senderUsername;
     private String content;
+    private java.util.List<AttachmentResponse> attachments;
     private Instant timestamp;
 }

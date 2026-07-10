@@ -93,3 +93,23 @@ The naive implementation of tracking receipts on a per-user per-message row basi
 1.  **Read Pointers (Watermarks)**: Instead of tracking every message receipt, track a single **read watermark** per user per channel (e.g., storing `last_read_message_id` or `last_read_at` timestamp). Because messages are ordered sequentially, if User X has read message #150, they have implicitly read all messages #1 to #149. This collapses 1,000 row inserts into a single SQL `UPDATE` statement per member.
 2.  **Write Coalition (Batching Updates)**: When users scroll through a chat history, do not fire a write request on every message. The client throttles read pointer pings (e.g., updating the watermark only when the user stops scrolling for 1 second, or batching updates in 2-second windows).
 3.  **Read-Aside Cache**: Store read watermarks in an active cache (e.g., Redis). When rendering chat rooms, the server queries watermarks from Redis at $O(1)$ speed. Watermarks are asynchronously flushed to PostgreSQL using write-behind queue workers.
+
+---
+
+## 7. High-Volume Media Uploads System Design Interview Q&A
+
+### Question 8: How do you design a high-throughput, secure media sharing architecture for a chat platform, avoiding server bandwidth saturation?
+**Model Answer**:
+Proxying high-volume media files (like 50MB videos) through the Spring Boot application server is a major bottleneck because it saturates application memory buffers and network cards, impacting concurrent chat connections.
+1.  **Pre-signed URLs (Direct Uploads)**:
+    - The client calls the backend REST API: `POST /api/v1/media/pre-signed-url` providing file metadata (name, size, type).
+    - The server verifies user session and authorization, then invokes AWS S3 client to generate a **Pre-signed PUT URL** with a short expiration (e.g. 5 minutes) and returns it.
+    - The client uploads the file stream **directly to S3** via HTTP PUT, bypassing our backend server completely.
+2.  **S3 Upload Callback (Webhook)**:
+    - Once the upload completes, S3 emits an event (or the client notifies our backend) with the key.
+    - The server links the key to the database, ensuring zero application bandwidth is wasted on file streams.
+3.  **Security Measures**:
+    - Validate file size limits during S3 pre-signed URL token generation.
+    - Audit file mime-types by deploying an asynchronous virus scanner (like ClamAV running inside a Lambda worker) triggered by S3 `ObjectCreated` events.
+    - Quarantine infected files immediately before they are distributed to clients.
+4.  **CDN Caching**: Route download requests through Amazon CloudFront to cache content at edge locations, ensuring files load fast globally.

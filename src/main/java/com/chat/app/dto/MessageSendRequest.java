@@ -19,7 +19,8 @@ public class MessageSendRequest {
     @NotNull(message = "Room ID is required")
     private UUID roomId;
 
-    @NotBlank(message = "Message content cannot be blank")
     @Size(max = 4000, message = "Message content cannot exceed 4000 characters")
     private String content;
+
+    private java.util.List<AttachmentRequest> attachments;
 }

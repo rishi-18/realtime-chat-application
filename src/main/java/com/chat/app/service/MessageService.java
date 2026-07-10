@@ -30,6 +30,11 @@ public class MessageService {
 
     @Transactional
     public Message saveMessage(MessageSendRequest request, UUID senderId) {
+        if ((request.getContent() == null || request.getContent().trim().isEmpty()) &&
+                (request.getAttachments() == null || request.getAttachments().isEmpty())) {
+            throw new IllegalArgumentException("Message must contain either text content or attachments.");
+        }
+
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new RoomNotFoundException("Room not found with id: " + request.getRoomId()));
 
@@ -46,7 +51,45 @@ public class MessageService {
                 .content(request.getContent())
                 .build();
 
+        if (request.getAttachments() != null && !request.getAttachments().isEmpty()) {
+            for (com.chat.app.dto.AttachmentRequest attReq : request.getAttachments()) {
+                com.chat.app.model.MessageAttachment attachment = com.chat.app.model.MessageAttachment.builder()
+                        .message(message)
+                        .fileName(attReq.getFileName())
+                        .fileUrl(attReq.getFileUrl())
+                        .fileType(attReq.getFileType())
+                        .fileSize(attReq.getFileSize())
+                        .build();
+                message.getAttachments().add(attachment);
+            }
+        }
+
         return messageRepository.save(message);
+    }
+
+    public com.chat.app.dto.MessageResponse mapToResponse(Message message) {
+        java.util.List<com.chat.app.dto.AttachmentResponse> attachments = null;
+        if (message.getAttachments() != null) {
+            attachments = message.getAttachments().stream()
+                    .map(att -> com.chat.app.dto.AttachmentResponse.builder()
+                            .id(att.getId())
+                            .fileName(att.getFileName())
+                            .fileUrl(att.getFileUrl())
+                            .fileType(att.getFileType())
+                            .fileSize(att.getFileSize())
+                            .build())
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        return com.chat.app.dto.MessageResponse.builder()
+                .id(message.getId())
+                .roomId(message.getRoom().getId())
+                .senderId(message.getSender() != null ? message.getSender().getId() : null)
+                .senderUsername(message.getSender() != null ? message.getSender().getUsername() : "Deleted User")
+                .content(message.getContent())
+                .attachments(attachments)
+                .timestamp(message.getCreatedAt())
+                .build();
     }
 
     @Transactional(readOnly = true)

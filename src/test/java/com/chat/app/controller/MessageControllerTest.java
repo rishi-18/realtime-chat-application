@@ -68,11 +68,13 @@ class MessageControllerTest {
         Message message = Message.builder()
                 .id(UUID.randomUUID())
                 .room(room)
+                .sender(com.chat.app.model.User.builder().id(userId).username("testuser").build())
                 .content("hello world")
                 .createdAt(Instant.now())
                 .build();
 
         when(messageService.saveMessage(any(MessageSendRequest.class), eq(userId))).thenReturn(message);
+        when(messageService.mapToResponse(any(Message.class))).thenCallRealMethod();
 
         // Act
         messageController.sendMessage(request, mockPrincipal);

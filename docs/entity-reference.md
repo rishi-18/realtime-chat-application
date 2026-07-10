@@ -47,11 +47,26 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
 ---
 
 ## 5. Message Entity
-- **Purpose**: Represents a text message sent within a room.
+- **Purpose**: Represents a text message sent within a room, optionally containing file attachments.
 - **Properties**:
   - `id`: UUID Primary Key, auto-generated.
   - `room`: Lazy `Room` reference (Cascade deletion when room is deleted).
   - `sender`: Lazy `User` reference (Mapped with `ON DELETE SET NULL` to preserve message logs if user is deleted).
-  - `content`: TEXT column.
+  - `content`: TEXT column, nullable (if attachments are present).
+  - `attachments`: One-to-Many relationship (`List<MessageAttachment>`), eagerly loaded or fetched as needed, with cascade operations enabled.
   - `createdAt`: Timestamp, managed by JPA auditing.
-- **Validation**: `content` must be between 1 and 4000 characters.
+- **Validation**: `content` must be between 1 and 4000 characters if no attachments are present.
+
+---
+
+## 6. MessageAttachment Entity
+- **Purpose**: Represents files or images attached to a message.
+- **Properties**:
+  - `id`: UUID Primary Key, auto-generated.
+  - `message`: Lazy `Message` parent reference.
+  - `fileName`: VARCHAR(255) file label.
+  - `fileUrl`: VARCHAR(512) file download url.
+  - `fileType`: VARCHAR(100) Mime-type classification (e.g. image/png).
+  - `fileSize`: BIGINT value.
+  - `createdAt`: Timestamp.
+- **Validation**: `fileUrl` and `fileName` must not be blank. `fileSize` must be greater than 0.

@@ -85,3 +85,10 @@ graph TD
 - The interceptor verifies room membership.
 - The server updates `last_read_message_id` on the user's `RoomMember` record in PostgreSQL.
 - The server broadcasts the receipt update to `/topic/receipts.{roomId}` to inform other members of their updated read pointer.
+
+### 7. Media & Attachment Handling (REST Upload + WebSocket Alert)
+- Users upload media files (images, files) via `MediaController` using multipart forms.
+- The server validates file types and sizes.
+- The file is saved to the local file system (or object storage).
+- The server returns the media URL and metadata.
+- When the client sends the message via WebSocket, it includes the media URL, linking the attachment to the chat log.

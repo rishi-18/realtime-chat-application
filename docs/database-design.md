@@ -45,6 +45,15 @@ erDiagram
         text content
         timestamp created_at
     }
+    message_attachments {
+        uuid id PK
+        uuid message_id FK
+        varchar file_name
+        varchar file_url
+        varchar file_type
+        bigint file_size
+        timestamp created_at
+    }
 
     users ||--o{ refresh_tokens : "generates"
     users ||--o{ rooms : "creates"
@@ -52,6 +61,7 @@ erDiagram
     rooms ||--o{ room_members : "has"
     users ||--o{ messages : "sends"
     rooms ||--o{ messages : "contains"
+    messages ||--o{ message_attachments : "contains"
 ```
 
 ---
@@ -83,6 +93,18 @@ erDiagram
   - `sender_id` references `users(id)` with `ON DELETE SET NULL` (preserves historical messages when a user account is deleted).
 - **Indexes**:
   - **Composite Index**: `idx_messages_room_created` on columns `(room_id, created_at DESC)`. This is optimized for paginated message retrieval (ordering by newest first within a room), eliminating the need for database sorting on large datasets.
+
+### Table: `message_attachments`
+- **Primary Key**: `id` (UUIDv4)
+- **Foreign Keys**:
+  - `message_id` references `messages(id)` with `ON DELETE CASCADE`.
+- **Columns**:
+  - `file_name` (VARCHAR(255), NOT NULL)
+  - `file_url` (VARCHAR(512), NOT NULL)
+  - `file_type` (VARCHAR(100), NOT NULL)
+  - `file_size` (BIGINT, NOT NULL)
+- **Indexes**:
+  - `idx_attachments_message` on column `message_id` (B-Tree). Optimized for retrieving attachments associated with messages.
 
 ---
 

@@ -39,14 +39,7 @@ public class MessageController {
         Message message = messageService.saveMessage(request, userPrincipal.getId());
 
         // Assemble broadcast payload
-        MessageResponse response = MessageResponse.builder()
-                .id(message.getId())
-                .roomId(message.getRoom().getId())
-                .senderId(userPrincipal.getId())
-                .senderUsername(userPrincipal.getUsername())
-                .content(message.getContent())
-                .timestamp(message.getCreatedAt())
-                .build();
+        MessageResponse response = messageService.mapToResponse(message);
 
         // Broadcast to dynamic STOMP topic destination
         String destination = "/topic/room." + request.getRoomId();

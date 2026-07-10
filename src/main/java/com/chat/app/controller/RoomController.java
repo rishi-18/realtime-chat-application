@@ -78,14 +78,7 @@ public class RoomController {
         // Guard against memory-exhaustion (OOM) vector: ceiling cap maximum page size to 100
         int sanitizedSize = Math.max(1, Math.min(size, 100));
         Page<Message> messages = messageService.getMessageHistory(roomId, userPrincipal.getId(), page, sanitizedSize);
-        Page<MessageResponse> responses = messages.map(message -> MessageResponse.builder()
-                .id(message.getId())
-                .roomId(message.getRoom().getId())
-                .senderId(message.getSender() != null ? message.getSender().getId() : null)
-                .senderUsername(message.getSender() != null ? message.getSender().getUsername() : "Deleted User")
-                .content(message.getContent())
-                .timestamp(message.getCreatedAt())
-                .build());
+        Page<MessageResponse> responses = messages.map(messageService::mapToResponse);
         return ResponseEntity.ok(responses);
     }
 

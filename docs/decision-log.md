@@ -154,3 +154,25 @@ We chose **Option A (Stateless In-Memory Relay with database membership check)**
 
 ### Final Decision & Rationale
 We chose **Option A (Read Pointer Watermarks)**. Storing a `last_read_message_id` on the `room_members` table collapsing all prior message reads into a single cell pointer completely avoids high-frequency row inserts. It scales efficiently to large group channels since write operations are flat-rate updates rather than multiplying on message frequency.
+
+---
+
+## Decision 10: Media & Attachment Upload Architecture
+
+- **Context**: Deciding how to ingest, validate, and store file attachments.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Pre-signed cloud S3 PUT URLs**.
+  - **Option B: Backend Proxy Uploads (REST Multipart Local Storage) [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Pre-signed S3 URLs) | Option B (Backend Proxy Uploads) [Chosen] |
+| :--- | :--- | :--- |
+| **Server Bandwidth Load**| **Extremely Low** (Direct client-to-cloud streams) | High (Streams pass through application memory) |
+| **System Complexity** | High (Requires AWS S3 configurations & tokens) | **Low (Uses local directories directly)** |
+| **Access Controls** | Medium (Requires S3 IAM Bucket policies) | **High (Backend handles authorization checks)** |
+
+### Final Decision & Rationale
+We chose **Option B (Backend Proxy Uploads)** storing files in a local folder for the initial core release. This eliminates cloud account setup dependencies and keeps local development simple. We enforce security validations (10MB limits, mime-type verification) inside Spring. When horizontal scaling is required, we will transition to Option A to protect server CPU and bandwidth.

@@ -141,4 +141,78 @@ class MessageServiceTest {
         assertThrows(AccessDeniedException.class, () -> messageService.getMessageHistory(roomId, userId, 0, 50));
         verify(messageRepository, never()).findByRoomId(eq(roomId), any(PageRequest.class));
     }
+    @Test
+    void saveMessage_Success_WithAttachments() {
+        // Arrange
+        com.chat.app.dto.AttachmentRequest attachmentRequest = com.chat.app.dto.AttachmentRequest.builder()
+                .fileName("test.png")
+                .fileUrl("/uploads/test.png")
+                .fileType("image/png")
+                .fileSize(100L)
+                .build();
+        sendRequest.setAttachments(Collections.singletonList(attachmentRequest));
+
+        when(roomRepository.findById(room.getId())).thenReturn(Optional.of(room));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+
+        Message savedMessage = Message.builder()
+                .id(UUID.randomUUID())
+                .room(room)
+                .sender(sender)
+                .content(sendRequest.getContent())
+                .attachments(new java.util.ArrayList<>())
+                .build();
+        when(messageRepository.save(any(Message.class))).thenReturn(savedMessage);
+
+        // Act
+        Message result = messageService.saveMessage(sendRequest, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        verify(messageRepository, times(1)).save(any(Message.class));
+    }
+
+    @Test
+    void saveMessage_Success_WithOnlyAttachmentsNoText() {
+        // Arrange
+        com.chat.app.dto.AttachmentRequest attachmentRequest = com.chat.app.dto.AttachmentRequest.builder()
+                .fileName("test.png")
+                .fileUrl("/uploads/test.png")
+                .fileType("image/png")
+                .fileSize(100L)
+                .build();
+        sendRequest.setContent(null);
+        sendRequest.setAttachments(Collections.singletonList(attachmentRequest));
+
+        when(roomRepository.findById(room.getId())).thenReturn(Optional.of(room));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+
+        Message savedMessage = Message.builder()
+                .id(UUID.randomUUID())
+                .room(room)
+                .sender(sender)
+                .attachments(new java.util.ArrayList<>())
+                .build();
+        when(messageRepository.save(any(Message.class))).thenReturn(savedMessage);
+
+        // Act
+        Message result = messageService.saveMessage(sendRequest, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        verify(messageRepository, times(1)).save(any(Message.class));
+    }
+
+    @Test
+    void saveMessage_ThrowsIllegalArgumentException_WhenEmpty() {
+        // Arrange
+        sendRequest.setContent(null);
+        sendRequest.setAttachments(null);
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> messageService.saveMessage(sendRequest, sender.getId()));
+        verify(messageRepository, never()).save(any(Message.class));
+    }
 }

@@ -121,3 +121,17 @@ In high-concurrency chat systems, tracking which messages have been read by whic
   - When a user reads the latest message, we update their single member record.
   - This collapses hundreds of individual row inserts into a single SQL `UPDATE` statement per user session.
   - To find if a specific message has been read by User X, we check if the message's creation date/ID is less than or equal to User X's last read message. This reduces database write loads by orders of magnitude.
+
+---
+
+## 9. Media Attachment Handling & Storage Integration
+
+Modern real-time systems handle file and media attachments securely using decoupled upload pipelines:
+
+1.  **Multipart File Ingestion**: Files are uploaded via REST (`multipart/form-data`) as `MultipartFile` streams.
+2.  **Mime-Type Auditing (Magic Numbers)**: Verifying file extensions (e.g. checking `.jpg`) is vulnerable to spoofing. Attackers can rename executable scripts (`shell.sh`) to images (`shell.jpg`) to bypass filters.
+    - *Mitigation*: The backend parses the **magic numbers** (first few bytes of the file stream) using Java's `Files.probeContentType()` or Apache Tika to determine the authentic content type before saving.
+3.  **Local Storage vs Object Storage**:
+    - **Local Block Storage**: Uploads are saved to the server's local file system (e.g., `/var/www/uploads`). It is simple to implement but has severe horizontal limitations (instances in a cluster do not share storage, and local disks are ephemeral).
+    - **Cloud Object Storage (S3)**: Files are written directly to S3 or Google Cloud Storage. Gateways generate **Pre-signed URLs** allowing clients to upload directly to S3 buckets, bypassing the application server to eliminate bandwidth bottlenecks.
+4.  **CDN Integration**: Attachment URLs reference a Content Delivery Network (e.g., CloudFront, Cloudflare) rather than raw S3 buckets, caching media at edge caches globally for sub-millisecond download times.
