@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: chat-app
+  datasource:
+    url: jdbc:postgresql://localhost:5432/chat_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  jwt:
+    # HMAC-SHA256 Secret Key (at least 256-bit / 32-byte representation)
+    # Using a pre-generated secure random string
+    secret: 9A4B8C7D6E5F4A3B2C1D0E9F8A7B6C5D4E3F2A1B0C9D8E7F6A5B4C3D2E1F0A9B
+    # 15 minutes = 900,000 milliseconds
+    accessTokenExpirationMs: 900000
+    # 7 days = 604,800,000 milliseconds
+    refreshTokenExpirationMs: 604800000
