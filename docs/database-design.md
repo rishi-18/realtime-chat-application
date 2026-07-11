@@ -109,6 +109,7 @@ erDiagram
   - `updated_at` (TIMESTAMP, NULLABLE)
 - **Indexes**:
   - **Composite Index**: `idx_messages_room_created` on columns `(room_id, created_at DESC)`. This is optimized for paginated message retrieval (ordering by newest first within a room), eliminating the need for database sorting on large datasets.
+  - **Full-Text GIN Index**: `idx_messages_content_fts` on column `to_tsvector('english', content)`. Optimized for keyword searches, bypassing expensive table scans.
 
 ### Table: `message_attachments`
 - **Primary Key**: `id` (UUIDv4)

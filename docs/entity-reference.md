@@ -58,6 +58,7 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `createdAt`: Timestamp, managed by JPA auditing.
   - `updatedAt`: Timestamp, updated when message is edited.
 - **Validation**: `content` must be between 1 and 4000 characters if no attachments are present and the message is not deleted.
+- **Indexing**: GIN (Generalized Inverted Index) is configured on the `content` field to support high-performance native full-text search.
 
 ---
 

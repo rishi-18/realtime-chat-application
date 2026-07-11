@@ -220,3 +220,25 @@ We chose **Option B (Soft-deletion)**. Preserving relational links (e.g. read po
 
 ### Final Decision & Rationale
 We chose **Option B (Batch Querying with In-Memory grouping)**. While Option A fetches everything in a single SQL query, joins containing multiple collection columns (e.g. messages with attachments AND reactions) trigger cartesian product row duplication, bloating network overhead and JVM memory. Performing a single batch query (`IN (:messageIds)`) resolves the N+1 query problem, keeping database traffic to exactly **two queries** per history request.
+
+---
+
+## Decision 13: Message Search Indexing Implementation
+
+- **Context**: Deciding the technical indexing approach for full-text search across channel logs.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: External Search Engine (Elasticsearch/OpenSearch) [Rejected for MVP]**.
+  - **Option B: PostgreSQL Native Full-Text Search with GIN Index [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Elasticsearch) | Option B (PostgreSQL GIN) [Chosen] |
+| :--- | :--- | :--- |
+| **Operational Complexity**| High (Requires clustering, sync piping, CDC setup) | **Extremely Low** (Native database feature) |
+| **Write Latency Penalty** | **None** (Async index ingestion) | High (Index write amplification on main DB) |
+| **Search Query Performance** | **High** (Dedicated inverted index cluster) | Medium-High (Logarithmic index scans on single DB) |
+
+### Final Decision & Rationale
+We chose **Option B (PostgreSQL Native Full-Text Search with GIN Index)**. For our current scale and development velocity, setting up a standalone Elasticsearch cluster and a Kafka/CDC sync pipeline represents excessive engineering overhead. Native PostgreSQL FTS with GIN indexes meets all response-time SLA bounds, simplifies deployments, and ensures immediate transactional search visibility. As the application grows to hundreds of millions of rows, we will scale out by migrating to Option A via async stream replication.

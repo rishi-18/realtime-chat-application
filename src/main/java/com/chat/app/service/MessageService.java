@@ -229,4 +229,33 @@ public class MessageService {
                 .username(user.getUsername())
                 .build();
     }
+
+    @Transactional(readOnly = true)
+    public Page<com.chat.app.dto.MessageResponse> searchRoomMessages(UUID roomId, UUID userId, String query, int page, int size) {
+        if (!roomRepository.existsById(roomId)) {
+            throw new RoomNotFoundException("Room not found with id: " + roomId);
+        }
+
+        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
+            throw new AccessDeniedException("Cannot search room messages. You are not a member of this room.");
+        }
+
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<Message> messages = messageRepository.searchRoomMessages(roomId, query, pageable);
+
+        java.util.List<UUID> messageIds = messages.getContent().stream()
+                .map(Message::getId)
+                .collect(java.util.stream.Collectors.toList());
+
+        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
+        if (!messageIds.isEmpty()) {
+            java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(messageIds);
+            reactionsMap = reactions.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
+        }
+
+        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
+
+        return messages.map(message -> mapToResponse(message, finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList())));
+    }
 }

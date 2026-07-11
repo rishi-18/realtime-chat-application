@@ -202,6 +202,20 @@ Retrieves historical messages for a room, ordered by creation date descending.
     }
     ```
 
+### Search Messages
+Searches keyword content within a specific room. Only members of the room can query.
+*   **Route**: `GET /rooms/{roomId}/messages/search`
+*   **Query Parameters**:
+    - `query` (string, required): Keyword search string (minimum 2 characters).
+    - `page` (number, optional, default: 0): Page index.
+    - `size` (number, optional, default: 50): Number of items per page.
+*   **Authentication**: Required (Valid Access Token, User must be a room member)
+*   **Success Response (`200 OK`)**: Paginated list of MessageResponse objects containing matches.
+*   **Errors**:
+    - `400 Bad Request`: `BAD_REQUEST` (Blank search query or query length less than 2 characters).
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not a member of the room).
+    - `404 Not Found`: `ROOM_NOT_FOUND` (Room does not exist).
+
 ### Fetch Room Presence
 Retrieves the online status of all members of a chat room.
 *   **Route**: `GET /rooms/{roomId}/presence`

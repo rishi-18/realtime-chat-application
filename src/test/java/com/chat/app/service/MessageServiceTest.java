@@ -345,4 +345,47 @@ class MessageServiceTest {
         assertEquals("REMOVED", result.getAction());
         verify(messageReactionRepository, times(1)).delete(any(com.chat.app.model.MessageReaction.class));
     }
+
+    @Test
+    void searchRoomMessages_Success() {
+        // Arrange
+        UUID roomId = room.getId();
+        String query = "hello";
+        PageRequest pageable = PageRequest.of(0, 10);
+        Message message = Message.builder()
+                .id(UUID.randomUUID())
+                .room(room)
+                .content("hello world")
+                .sender(sender)
+                .isDeleted(false)
+                .createdAt(java.time.Instant.now())
+                .build();
+        Page<Message> pageResult = new org.springframework.data.domain.PageImpl<>(Collections.singletonList(message));
+
+        when(roomRepository.existsById(roomId)).thenReturn(true);
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.getId())).thenReturn(true);
+        when(messageRepository.searchRoomMessages(eq(roomId), eq(query), any(PageRequest.class))).thenReturn(pageResult);
+        when(messageReactionRepository.findByMessageIdIn(anyList())).thenReturn(Collections.emptyList());
+
+        // Act
+        Page<com.chat.app.dto.MessageResponse> results = messageService.searchRoomMessages(roomId, sender.getId(), query, 0, 10);
+
+        // Assert
+        assertNotNull(results);
+        assertEquals(1, results.getTotalElements());
+        assertEquals("hello world", results.getContent().get(0).getContent());
+    }
+
+    @Test
+    void searchRoomMessages_ThrowsAccessDeniedException_WhenNotMember() {
+        // Arrange
+        UUID roomId = room.getId();
+
+        when(roomRepository.existsById(roomId)).thenReturn(true);
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.getId())).thenReturn(false);
+
+        // Act & Assert
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> messageService.searchRoomMessages(roomId, sender.getId(), "test", 0, 10));
+    }
 }

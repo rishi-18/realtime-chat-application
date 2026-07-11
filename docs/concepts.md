@@ -173,3 +173,29 @@ When clients retrieve the message history of a room (e.g. 50 messages), the serv
 -   **Centralized Batch Querying (Solution)**: Fetch the 50 messages first. Collect their IDs. Perform a single batch query to retrieve all reactions:
     `SELECT r FROM MessageReaction r WHERE r.message.id IN (:messageIds)`
     Group the results by message ID in memory using a Java `Map<UUID, List<MessageReaction>>` before transforming them to DTOs. This reduces the database round-trips to exactly **two queries** regardless of the page size, achieving $O(1)$ query aggregation scalability.
+
+---
+
+## 12. Full-Text Search Indexing & Postgres GIN (Generalized Inverted Index)
+
+In messaging systems, keyword search is a high-frequency operation. Implementing search efficiently requires specialized indexing strategies:
+
+### 1. The Cost of `LIKE` Queries
+Using SQL queries like `SELECT * FROM messages WHERE content LIKE '%keyword%'` triggers a **Full Table Scan**. The database must inspect every character of every row sequentially. As chat message logs reach millions of rows, search latency balloons, leading to slow page loads and high CPU load.
+
+### 2. Full-Text Search (FTS) in PostgreSQL
+PostgreSQL provides native Full-Text Search using two constructs:
+-   `tsvector`: Converts text into a list of lexemes (root words, stripping suffixes like "ing" or "ed" and common stop words like "the" or "and").
+-   `tsquery`: Parses search queries into lexemes linked by logical operators (AND, OR, NOT).
+
+### 3. GIN (Generalized Inverted Index)
+To make full-text search queries execute in sub-milliseconds, PostgreSQL uses **GIN Indexes**. Unlike B-Tree indexes which map a column value to a row, a GIN Index maps a single lexeme/word to a list of matching row locations where that word appears.
+-   *Syntax*: `CREATE INDEX idx_messages_content_fts ON messages USING gin(to_tsvector('english', content));`
+-   *Execution*: When a user searches for a term, PostgreSQL parses the query into a `tsquery` and scans the GIN index structure, returning matching primary key locations in logarithmic $O(\log N)$ time.
+
+### 4. Elasticsearch/OpenSearch Offloading (Scaling Pattern)
+For extremely high-scale applications, GIN write penalties (GIN indexes are slower to update during inserts because multiple lexemes must be inserted into the index for a single message) prompt organizations to move search out of the relational database:
+1.  Enable **Change Data Capture (CDC)** (e.g. Debezium) on the `messages` table.
+2.  Stream insert events to a Kafka topic.
+3.  Ingest logs into **Elasticsearch**.
+4.  Clients route search requests to Elasticsearch, offloading search queries entirely from the primary relational database.

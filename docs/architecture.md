@@ -105,3 +105,10 @@ graph TD
 - The server validates that the user is a member of the room where the target message resides.
 - The server adds/deletes a record in the `message_reactions` table using a toggle mechanism.
 - The server issues a STOMP broadcast to `/topic/room.{roomId}` containing the message ID and updated reaction count details. Peer clients sync their UI reaction indicators in real-time.
+
+### 10. Message Search (REST Full-Text Search)
+- A user submits a keyword search request to the REST endpoint `GET /api/v1/rooms/{roomId}/messages/search?query=keyword`.
+- The server validates that the user is a member of the target room.
+- The server queries the database using full-text search operators against the `content` field.
+- Database index scans are executed via a GIN index on message content vector representations.
+- The server returns a paginated list of matching message DTO responses.
