@@ -45,6 +45,9 @@ class JwtChannelInterceptorTest {
     @Mock
     private MessageChannel messageChannel;
 
+    @Mock
+    private WebSocketSessionBlacklist sessionBlacklist;
+
     @InjectMocks
     private JwtChannelInterceptor jwtChannelInterceptor;
 
@@ -93,6 +96,24 @@ class JwtChannelInterceptorTest {
         accessor.setSessionAttributes(attrs);
         accessor.setUser(new UsernamePasswordAuthenticationToken(userPrincipal, null));
         Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        // Act & Assert
+        assertThrows(AccessDeniedException.class, () -> jwtChannelInterceptor.preSend(message, messageChannel));
+    }
+
+    @Test
+    void preSend_BlacklistedSession_RejectsFrame() {
+        // Arrange
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/topic/room." + UUID.randomUUID());
+        HashMap<String, Object> attrs = new HashMap<>();
+        // Set future expiry
+        attrs.put("token_expiry", System.currentTimeMillis() + 100000);
+        accessor.setSessionAttributes(attrs);
+        accessor.setUser(new UsernamePasswordAuthenticationToken(userPrincipal, null));
+        Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        when(sessionBlacklist.isUserBlacklisted(userPrincipal.getId())).thenReturn(true);
 
         // Act & Assert
         assertThrows(AccessDeniedException.class, () -> jwtChannelInterceptor.preSend(message, messageChannel));

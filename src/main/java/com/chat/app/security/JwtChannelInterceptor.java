@@ -27,16 +27,19 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
     private final CustomUserDetailsService customUserDetailsService;
     private final RoomMemberRepository roomMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final WebSocketSessionBlacklist sessionBlacklist;
 
     public JwtChannelInterceptor(
             JwtTokenProvider tokenProvider,
             CustomUserDetailsService customUserDetailsService,
             RoomMemberRepository roomMemberRepository,
-            @Lazy SimpMessagingTemplate messagingTemplate) {
+            @Lazy SimpMessagingTemplate messagingTemplate,
+            WebSocketSessionBlacklist sessionBlacklist) {
         this.tokenProvider = tokenProvider;
         this.customUserDetailsService = customUserDetailsService;
         this.roomMemberRepository = roomMemberRepository;
         this.messagingTemplate = messagingTemplate;
+        this.sessionBlacklist = sessionBlacklist;
     }
 
     @Override
@@ -53,6 +56,15 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
                     if (System.currentTimeMillis() > expiryTime) {
                         log.warn("WebSocket session authentication expired. Rejecting frame: {}", command);
                         throw new AccessDeniedException("Your session has expired. Please reconnect.");
+                    }
+                }
+
+                Principal principal = accessor.getUser();
+                if (principal instanceof UsernamePasswordAuthenticationToken) {
+                    UserPrincipal userPrincipal = (UserPrincipal) ((UsernamePasswordAuthenticationToken) principal).getPrincipal();
+                    if (sessionBlacklist.isUserBlacklisted(userPrincipal.getId())) {
+                        log.warn("User {} session has been blacklisted/revoked. Rejecting frame: {}", userPrincipal.getUsername(), command);
+                        throw new AccessDeniedException("Your session has been terminated. Please log in again.");
                     }
                 }
             }
