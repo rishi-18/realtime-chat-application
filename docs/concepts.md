@@ -301,3 +301,30 @@ This structure ensures that Hibernate handles dirty-checking and state updates c
 To prevent cross-room threading vulnerabilities (e.g., posting a reply in Room A that links to a parent message in Room B):
 - When a user replies to a message, the backend validates that both the parent message and the reply belong to the exact same `room_id`.
 - If the parent message is soft-deleted, replies are still allowed (enabling users to see thread history even if the parent content is removed). If the parent message is permanently deleted, the database deletes the child replies automatically.
+
+---
+
+## 17. Direct Message Conversations & Dynamic Membership Routing
+
+Direct messaging is designed to establish private 1-on-1 channels between users. This requires unique identifier generation, auto-joining on room creation, and query isolation.
+
+### 1. Uniqueness Guarantee Without Lock Contention
+To prevent duplicate DM channels between User A and User B (which could result in split chat histories), we enforce a deterministic room naming formula:
+1.  Extract the two participating User IDs (UUIDs).
+2.  Sort them lexicographically so that `ID_A` is always less than `ID_B`.
+3.  Concatenate them as `ID_A + ":" + ID_B`.
+4.  Generate the MD5 hash of this string (resulting in a 32-character hex string).
+5.  Set the room name to `dm-{MD5}` (exactly 35 characters).
+
+Because the `rooms.name` column has a database-level `UNIQUE` constraint, concurrent creation requests automatically fail cleanly at the database level.
+
+### 2. Transactional Auto-Enrollment
+When a new DM room is created:
+- The system must automatically register both the creator and the recipient as `RoomMember` records inside the same transactional boundary.
+- Both participants are granted the `MEMBER` role to ensure symmetric access control.
+- Because room membership is checked on WebSocket subscriptions and REST requests, this auto-enrollment grants both users instant real-time access.
+
+### 3. Directory Listing & Isolation Bounds
+Unlike public group channels, private DM channels must not be visible to third parties. We enforce this through Query Isolation:
+- `roomRepository.findByRoomType(RoomType.PUBLIC_GROUP)` lists rooms for the public directory.
+- Joined rooms are retrieved by querying the membership table: `roomMemberRepository.findRoomsJoinedByUser(userId)`. This naturally returns both public channels and private DMs the user is enrolled in, without leaking private DM channels.

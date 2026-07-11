@@ -330,3 +330,25 @@ We chose **Option B (Static Hierarchical Roles)**. For an instant messaging appl
 
 ### Final Decision & Rationale
 We chose **Option A (Broadcast to Room)**. While Option B reduces traffic on peer clients, it requires clients to constantly subscribe and unsubscribe to active message threads. This increases WebSocket handshake and subscribe frame density on high-concurrency clusters. Option A allows clients to reuse their existing channel subscriptions. Standard room filtering logic on the client can hide or organize thread replies in the UI, keeping connection states clean.
+
+---
+
+## Decision 18: Direct Message Channel Identifier Strategy
+
+- **Context**: Deciding how to unique name and identify direct message (DM) room entries under the 50-character schema limit.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Lexicographically sort and concatenate raw UUIDs `dm-{UUID1}-{UUID2}` [Rejected]**.
+  - **Option B: Concatenate, sort, and MD5 hash the joint identifiers to produce `dm-{MD5}` [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Raw UUID Concatenation) | Option B (Lexicographical MD5 Hashing) [Chosen] |
+| :--- | :--- | :--- |
+| **Schema Compatibility** | Fails (76 characters exceed column limit of 50) | **Passes** (Fixed 35-character length fits column) |
+| **Debug Visibility** | **High** (Target user IDs visible directly in table row) | Low (Needs user-membership joins to identify users) |
+| **Execution Performance** | High (Simple string formatting) | High (MD5 calculation is trivial in memory) |
+
+### Final Decision & Rationale
+We chose **Option B (Lexicographical MD5 Hashing)**. Option A is unusable without changing the database schema since concatenating two 36-character UUIDs exceeds the 50-character limit of the `rooms.name` column. Changing the database schema is expensive and could break other dependencies. Option B generates a fixed 35-character alphanumeric room name (`dm-` + 32-character hex MD5). Because MD5 is deterministic, sorting the user IDs beforehand ensures the same unique name is generated regardless of who initiates the chat. This prevents duplicate DM rooms on a database level.

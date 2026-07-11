@@ -138,3 +138,10 @@ graph TD
 - Sending a message with a parent ID registers it as a reply, initiating a conversational thread.
 - Thread replies are broadcast to the room topic `/topic/room.{roomId}` to ensure normal flow synchronization.
 - Peer clients can fetch all replies under a specific thread tree using the REST endpoint `GET /api/v1/messages/{messageId}/thread` (efficient B-Tree index lookup on the self-referencing column).
+
+### 15. Direct Messaging & 1-on-1 Conversations
+- A Direct Message (DM) room represents a private 1-on-1 channel between exactly two users.
+- DMs are initiated via `POST /api/v1/rooms/dm` providing the target user's ID.
+- The system checks if a DM room already exists between the two users. If it does, the existing room is returned to prevent duplicate room creation.
+- If not, a new room with type `DIRECT_MESSAGE` is created, and both participants are automatically enrolled as room members.
+- Public directory lookups (`GET /api/v1/rooms`) exclude DM rooms to ensure privacy bounds. Clients access their active DM rooms through their joined rooms endpoint.

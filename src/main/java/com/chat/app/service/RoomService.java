@@ -29,6 +29,77 @@ public class RoomService {
     private final MessageRepository messageRepository;
 
     @Transactional
+    public Room createOrGetDirectMessageRoom(UUID creatorId, UUID recipientId) {
+        if (creatorId.equals(recipientId)) {
+            throw new IllegalArgumentException("Cannot start a direct message room with yourself.");
+        }
+
+        User creator = userRepository.findById(creatorId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + creatorId));
+        User recipient = userRepository.findById(recipientId)
+                .orElseThrow(() -> new IllegalArgumentException("Recipient user not found with id: " + recipientId));
+
+        String roomName = generateDirectMessageRoomName(creatorId, recipientId);
+
+        java.util.Optional<Room> existingRoom = roomRepository.findByName(roomName);
+        if (existingRoom.isPresent()) {
+            return existingRoom.get();
+        }
+
+        Room room = Room.builder()
+                .name(roomName)
+                .description("Direct message room between " + creator.getUsername() + " and " + recipient.getUsername())
+                .roomType(com.chat.app.model.RoomType.DIRECT_MESSAGE)
+                .createdBy(creator)
+                .build();
+
+        Room savedRoom = roomRepository.save(room);
+
+        RoomMemberId creatorMembershipId = RoomMemberId.builder()
+                .roomId(savedRoom.getId())
+                .userId(creator.getId())
+                .build();
+        RoomMember creatorMembership = RoomMember.builder()
+                .id(creatorMembershipId)
+                .room(savedRoom)
+                .user(creator)
+                .role(com.chat.app.model.RoomRole.MEMBER)
+                .build();
+        roomMemberRepository.save(creatorMembership);
+
+        RoomMemberId recipientMembershipId = RoomMemberId.builder()
+                .roomId(savedRoom.getId())
+                .userId(recipient.getId())
+                .build();
+        RoomMember recipientMembership = RoomMember.builder()
+                .id(recipientMembershipId)
+                .room(savedRoom)
+                .user(recipient)
+                .role(com.chat.app.model.RoomRole.MEMBER)
+                .build();
+        roomMemberRepository.save(recipientMembership);
+
+        return savedRoom;
+    }
+
+    private String generateDirectMessageRoomName(UUID id1, UUID id2) {
+        String s1 = id1.toString();
+        String s2 = id2.toString();
+        String combined = s1.compareTo(s2) < 0 ? s1 + ":" + s2 : s2 + ":" + s1;
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] hashBytes = md.digest(combined.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return "dm-" + sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("MD5 digest algorithm not available", e);
+        }
+    }
+
+    @Transactional
     public Room createRoom(RoomCreateRequest request, UUID creatorId) {
         if (roomRepository.existsByName(request.getName())) {
             throw new RoomAlreadyExistsException("A room with the name '" + request.getName() + "' already exists.");
@@ -118,10 +189,22 @@ public class RoomService {
                     .orElseThrow(() -> new RoomNotFoundException("Existing DM room not found in repository."));
         }
 
-        // Generate unique deterministic name
+        // Generate unique deterministic name (MD5 hashed to fit 50-character schema limit)
         String id1 = creatorId.toString();
         String id2 = recipientId.toString();
-        String dmName = id1.compareTo(id2) < 0 ? "dm:" + id1 + ":" + id2 : "dm:" + id2 + ":" + id1;
+        String combined = id1.compareTo(id2) < 0 ? id1 + ":" + id2 : id2 + ":" + id1;
+        String dmName;
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] hashBytes = md.digest(combined.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            dmName = "dm-" + sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("MD5 digest algorithm not available", e);
+        }
 
         Room room = Room.builder()
                 .name(dmName)

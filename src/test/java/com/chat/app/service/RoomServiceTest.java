@@ -155,7 +155,7 @@ class RoomServiceTest {
 
         Room savedRoom = Room.builder()
                 .id(UUID.randomUUID())
-                .name("dm:" + creatorId + ":" + recipientId)
+                .name("dm-hashedname")
                 .createdBy(creator)
                 .roomType(com.chat.app.model.RoomType.DIRECT_MESSAGE)
                 .build();
@@ -186,7 +186,7 @@ class RoomServiceTest {
 
         Room existingRoom = Room.builder()
                 .id(existingRoomId)
-                .name("dm:" + creatorId + ":" + recipientId)
+                .name("dm-hashedname")
                 .createdBy(creator)
                 .roomType(com.chat.app.model.RoomType.DIRECT_MESSAGE)
                 .build();

@@ -58,7 +58,7 @@ Initiates a 1-to-1 private chat channel with another user, or returns the existi
     ```json
     {
       "id": "e3b0c442-9c0b-4ef8-bb6d-6bb9bd380a11",
-      "name": "dm:a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11:b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22",
+      "name": "dm-b3a58e578c764dd098d580aa8efec20a",
       "description": "Direct message room",
       "createdBy": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       "createdAt": "2026-07-11T04:15:00Z",

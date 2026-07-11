@@ -29,7 +29,7 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `createdBy`: User entity reference. Configured as `LAZY` to avoid overhead during room listing.
   - `createdAt`: Timestamp, managed by JPA auditing.
 - **Validation**: 
-  - `name` must be between 3 and 50 characters, restricted to `^[a-zA-Z0-9_-]+$` (for groups) or `^dm:[a-fA-F0-9-]{36}:[a-fA-F0-9-]{36}$` (for direct messages).
+  - `name` must be between 3 and 50 characters. For group channels, it is restricted to `^[a-zA-Z0-9_-]+$`. For direct messages, it is auto-generated as `dm-{MD5(sorted_userIds)}` (exactly 35 characters) to fit within the 50-character schema limit.
   - `roomType` must not be null.
 
 ---

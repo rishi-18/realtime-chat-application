@@ -103,7 +103,7 @@ erDiagram
 - **Primary Key**: `id` (UUIDv4)
 - **Foreign Key**: `created_by` referencing `users(id)`
 - **Columns**:
-  - `name` (VARCHAR(50), UNIQUE, NOT NULL)
+  - `name` (VARCHAR(50), UNIQUE, NOT NULL). For group rooms, this is user-inputted. For DMs, this is an auto-generated string: `dm-{userId1}-{userId2}` where the user IDs are sorted lexicographically to enforce database-level uniqueness and prevent duplicate DM rooms.
   - `room_type` (VARCHAR(20), NOT NULL, default 'PUBLIC_GROUP'). Contains: 'PUBLIC_GROUP' or 'DIRECT_MESSAGE'.
 - **Indexes**:
   - `idx_rooms_name` on column `name` (B-Tree). Optimized for checking existence during creation.
