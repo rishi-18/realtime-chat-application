@@ -374,3 +374,25 @@ We chose **Option B (Lexicographical MD5 Hashing)**. Option A is unusable withou
 
 ### Final Decision & Rationale
 We chose **Option B (MessageRevision Entity)**. While Hibernate Envers is useful for tracking all entity changes across the system, it adds unnecessary database overhead and complex queries for this feature. A simple, standalone `MessageRevision` entity allows us to use standard Spring Data JPA repositories. It only writes to the database when a message is edited, keeping database overhead low and the API straightforward.
+
+---
+
+## Decision 20: Clustered Message Broker Infrastructure Choice
+
+- **Context**: Deciding which shared broker to use for routing WebSocket events across horizontally scaled instances.
+- **Date**: 2026-07-12
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: RabbitMQ or Apache Kafka [Rejected]**.
+  - **Option B: Redis Pub/Sub [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Kafka / RabbitMQ) | Option B (Redis Pub/Sub) [Chosen] |
+| :--- | :--- | :--- |
+| **System Overhead** | High (Requires deploying separate message queues, zookeeper, or clusters) | **Low** (Uses the existing Redis cache engine instance) |
+| **Delivery Latency** | Low (Sub-millisecond) | **Extremely Low** (Sub-millisecond, runs entirely in-memory) |
+| **Message Durability** | **High** (Kafka stores messages persistently on disk) | None (Fire-and-forget: drops messages if no nodes are active) |
+
+### Final Decision & Rationale
+We chose **Option B (Redis Pub/Sub)**. Real-time chat features like typing alerts, presence, and message relays are transient and do not require disk-backed persistence (messages are already saved to PostgreSQL). Redis Pub/Sub runs in-memory and has sub-millisecond latency. Since most chat apps already use Redis for caching and presence, using it for Pub/Sub adds no new infrastructure overhead, making it the most cost-effective and performant choice.

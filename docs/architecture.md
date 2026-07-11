@@ -152,3 +152,9 @@ graph TD
 - Users can fetch the history of edits for a message using the REST endpoint `GET /api/v1/messages/{messageId}/history`.
 - In-memory checks verify room membership of the requesting user, securing audit access against non-member access attempts.
 - Cascading deletion rules are configured so that deleting a message automatically purges its associated audit revision logs.
+
+### 17. Shared Redis Pub/Sub Message Broker (WebSocket Horizontal Scaling)
+- Real-time messages are routed via a shared **Redis Pub/Sub** message broker channel to support horizontal clustering.
+- When a node receives a WebSocket message on `/app/chat.sendMessage`, it processes the transaction, saves it to the database, and publishes the event to a shared Redis channel.
+- All cluster nodes listen to this Redis channel. When they receive an event, they route the payload to any local clients subscribed to `/topic/room.{roomId}`.
+- This ensures that users receive messages in real-time, even if they are connected to different application server instances.

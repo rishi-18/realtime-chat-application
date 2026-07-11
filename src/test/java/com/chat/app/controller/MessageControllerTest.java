@@ -41,6 +41,9 @@ class MessageControllerTest {
     @Mock
     private com.chat.app.service.RoomService roomService;
 
+    @Mock
+    private com.chat.app.config.RedisPublisher redisPublisher;
+
     @InjectMocks
     private MessageController messageController;
 
@@ -94,7 +97,7 @@ class MessageControllerTest {
         verify(messageService, times(1)).saveMessage(any(MessageSendRequest.class), eq(userId));
 
         ArgumentCaptor<MessageResponse> captor = ArgumentCaptor.forClass(MessageResponse.class);
-        verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/room." + roomId), captor.capture());
+        verify(redisPublisher, times(1)).publish(captor.capture());
 
         MessageResponse response = captor.getValue();
         assertEquals("hello world", response.getContent());

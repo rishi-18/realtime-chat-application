@@ -211,3 +211,5 @@ erDiagram
     - Simultaneous attempts by a user to join a room acquire a shared read lock on the user and room tables, and attempt an `INSERT` into `room_members`. The composite primary key enforces uniqueness, returning a constraint violation if duplicate requests occur.
 3.  **Hibernate Session Performance**:
     - We use `@Transactional(readOnly = true)` for read-only actions (like fetching message lists or checking memberships). This disables Hibernate's automatic dirty checking of loaded entities, reducing CPU overhead and connection hold times.
+4.  **Stateless Redis Pub/Sub Relay**:
+    - Real-time message events are routed asynchronously via Redis Pub/Sub channels outside of database transactions. This ensures that database write locks are released immediately and do not block the delivery of real-time events.

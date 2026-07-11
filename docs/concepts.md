@@ -352,3 +352,32 @@ Soft-deleting a message retains the message record, meaning revision logs remain
 If a message is permanently deleted:
 - The database engine uses a foreign key constraint with `ON DELETE CASCADE` on `message_revisions.message_id` to automatically delete all related revision logs.
 - This prevents orphaned records and keeps the database clean.
+
+---
+
+## 19. Distributed WebSocket Event Relays & Pub/Sub Brokers
+
+Scaling stateful protocols like WebSockets horizontally requires synchronizing event broadcasts across independent server nodes.
+
+```mermaid
+sequence-diagram
+    User A -> Gateway Node 1: WebSocket Send Frame
+    Gateway Node 1 -> Database: Save Message (Transaction)
+    Gateway Node 1 -> Redis Pub/Sub: Publish event payload
+    Redis Pub/Sub -> Gateway Node 2: Broadcast Event Relay
+    Gateway Node 2 -> User B: Forward WebSocket Frame (Relay)
+```
+
+### 1. Stateful Sockets vs Stateless Scaling
+WebSockets maintain a long-lived TCP connection to a single instance. In a clustered environment (e.g., behind an AWS Application Load Balancer), a client is pinned to one instance.
+*   If User A is on `Node 1` and User B is on `Node 2`, Node 1 cannot send messages to User B directly.
+*   *Solution*: Interconnect nodes using a shared message broker.
+
+### 2. Redis Pub/Sub Architecture
+Redis Pub/Sub allows nodes to publish messages to a channel and subscribe to receive them.
+- When an instance receives a new chat message, it processes and saves it, then publishes the JSON payload to the shared Redis channel (`chat-events`).
+- Every cluster node subscribes to `chat-events` on startup.
+- When an instance receives an event from Redis, it checks if it has active WebSocket subscribers for that room. If so, it forwards the message to those clients.
+
+### 3. Serialization and Deserialization Protocol
+Since Redis channels handle raw bytes or strings, we serialize DTO objects (like `MessageResponse`) to JSON before publishing. The receiving nodes deserialize the JSON back into Java objects before broadcasting them over the WebSocket connection. This ensures compatibility across instances.

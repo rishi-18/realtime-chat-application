@@ -24,6 +24,7 @@ public class MessageController {
     private final MessageService messageService;
     private final SimpMessagingTemplate messagingTemplate;
     private final com.chat.app.service.RoomService roomService;
+    private final com.chat.app.config.RedisPublisher redisPublisher;
 
     @MessageMapping("/chat.sendMessage")
     public void sendMessage(@Payload @Valid MessageSendRequest request, Principal principal) {
@@ -41,10 +42,9 @@ public class MessageController {
         // Assemble broadcast payload
         MessageResponse response = messageService.mapToResponse(message);
 
-        // Broadcast to dynamic STOMP topic destination
-        String destination = "/topic/room." + request.getRoomId();
-        messagingTemplate.convertAndSend(destination, response);
-        log.debug("Broadcasted message {} to destination {}", message.getId(), destination);
+        // Publish to shared Redis Pub/Sub channel
+        redisPublisher.publish(response);
+        log.debug("Published message {} to Redis Pub/Sub", message.getId());
     }
 
     @MessageMapping("/chat.typing")
