@@ -614,4 +614,35 @@ class MessageServiceTest {
             messageService.deleteMessage(messageId, otherMemberId);
         });
     }
+
+    @Test
+    void deleteMessage_CascadesPinDelete_WhenPinned() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .sender(sender)
+                .content("original content")
+                .isDeleted(false)
+                .build();
+
+        com.chat.app.model.PinnedMessage pin = com.chat.app.model.PinnedMessage.builder()
+                .message(message)
+                .room(room)
+                .pinnedBy(sender)
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(pinnedMessageRepository.findByRoomIdAndMessageId(room.getId(), messageId)).thenReturn(Optional.of(pin));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        Message result = messageService.deleteMessage(messageId, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        assertTrue(result.isDeleted());
+        verify(pinnedMessageRepository, times(1)).delete(pin);
+    }
 }

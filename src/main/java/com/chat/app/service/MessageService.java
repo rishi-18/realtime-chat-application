@@ -301,6 +301,11 @@ public class MessageService {
         message.getAttachments().clear();
         message.setUpdatedAt(java.time.Instant.now());
 
+        if (message.getRoom() != null) {
+            pinnedMessageRepository.findByRoomIdAndMessageId(message.getRoom().getId(), messageId)
+                    .ifPresent(pinnedMessageRepository::delete);
+        }
+
         return messageRepository.save(message);
     }
 
