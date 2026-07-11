@@ -88,7 +88,9 @@ public class MessageService {
                 .senderUsername(message.getSender() != null ? message.getSender().getUsername() : "Deleted User")
                 .content(message.getContent())
                 .attachments(attachments)
+                .isDeleted(message.isDeleted())
                 .timestamp(message.getCreatedAt())
+                .updatedAt(message.getUpdatedAt())
                 .build();
     }
 
@@ -105,5 +107,45 @@ public class MessageService {
         // Sort messages by newest first
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return messageRepository.findByRoomId(roomId, pageRequest);
+    }
+
+    @Transactional
+    public Message editMessage(UUID messageId, com.chat.app.dto.MessageUpdateRequest request, UUID userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found with id: " + messageId));
+
+        if (message.isDeleted()) {
+            throw new IllegalArgumentException("Cannot edit a soft-deleted message.");
+        }
+
+        if (message.getSender() == null || !message.getSender().getId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("You are not authorized to edit this message.");
+        }
+
+        message.setContent(request.getContent());
+        message.setUpdatedAt(java.time.Instant.now());
+
+        return messageRepository.save(message);
+    }
+
+    @Transactional
+    public Message deleteMessage(UUID messageId, UUID userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found with id: " + messageId));
+
+        if (message.isDeleted()) {
+            return message;
+        }
+
+        if (message.getSender() == null || !message.getSender().getId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("You are not authorized to delete this message.");
+        }
+
+        message.setDeleted(true);
+        message.setContent(null);
+        message.getAttachments().clear();
+        message.setUpdatedAt(java.time.Instant.now());
+
+        return messageRepository.save(message);
     }
 }

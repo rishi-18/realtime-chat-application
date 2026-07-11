@@ -215,4 +215,72 @@ class MessageServiceTest {
         assertThrows(IllegalArgumentException.class, () -> messageService.saveMessage(sendRequest, sender.getId()));
         verify(messageRepository, never()).save(any(Message.class));
     }
+
+    @Test
+    void editMessage_Success() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        com.chat.app.dto.MessageUpdateRequest updateRequest = new com.chat.app.dto.MessageUpdateRequest("new content");
+        Message message = Message.builder()
+                .id(messageId)
+                .sender(sender)
+                .content("old content")
+                .isDeleted(false)
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        Message result = messageService.editMessage(messageId, updateRequest, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("new content", result.getContent());
+        assertNotNull(result.getUpdatedAt());
+    }
+
+    @Test
+    void editMessage_ThrowsAccessDeniedException_WhenNotOwner() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        com.chat.app.dto.MessageUpdateRequest updateRequest = new com.chat.app.dto.MessageUpdateRequest("new content");
+        Message message = Message.builder()
+                .id(messageId)
+                .sender(sender)
+                .content("old content")
+                .isDeleted(false)
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+
+        // Act & Assert
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> messageService.editMessage(messageId, updateRequest, UUID.randomUUID()));
+    }
+
+    @Test
+    void deleteMessage_Success() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .sender(sender)
+                .content("some content")
+                .attachments(new java.util.ArrayList<>())
+                .isDeleted(false)
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        Message result = messageService.deleteMessage(messageId, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        assertTrue(result.isDeleted());
+        assertNull(result.getContent());
+        assertTrue(result.getAttachments().isEmpty());
+    }
 }

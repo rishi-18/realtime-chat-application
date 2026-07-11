@@ -43,7 +43,9 @@ erDiagram
         uuid room_id FK
         uuid sender_id FK
         text content
+        boolean is_deleted
         timestamp created_at
+        timestamp updated_at
     }
     message_attachments {
         uuid id PK
@@ -91,6 +93,11 @@ erDiagram
 - **Foreign Keys**:
   - `room_id` references `rooms(id)` with `ON DELETE CASCADE`.
   - `sender_id` references `users(id)` with `ON DELETE SET NULL` (preserves historical messages when a user account is deleted).
+- **Columns**:
+  - `content` (TEXT, NULLABLE)
+  - `is_deleted` (BOOLEAN, NOT NULL, DEFAULT FALSE)
+  - `created_at` (TIMESTAMP, NOT NULL)
+  - `updated_at` (TIMESTAMP, NULLABLE)
 - **Indexes**:
   - **Composite Index**: `idx_messages_room_created` on columns `(room_id, created_at DESC)`. This is optimized for paginated message retrieval (ordering by newest first within a room), eliminating the need for database sorting on large datasets.
 

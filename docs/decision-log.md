@@ -176,3 +176,25 @@ We chose **Option A (Read Pointer Watermarks)**. Storing a `last_read_message_id
 
 ### Final Decision & Rationale
 We chose **Option B (Backend Proxy Uploads)** storing files in a local folder for the initial core release. This eliminates cloud account setup dependencies and keeps local development simple. We enforce security validations (10MB limits, mime-type verification) inside Spring. When horizontal scaling is required, we will transition to Option A to protect server CPU and bandwidth.
+
+---
+
+## Decision 11: Message Deletion Pattern
+
+- **Context**: Deciding how to remove message data when requested by a user.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Hard-deletion (SQL DELETE) [Rejected]**.
+  - **Option B: Soft-deletion (is_deleted flag + content nullification) [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Hard-deletion) | Option B (Soft-deletion) [Chosen] |
+| :--- | :--- | :--- |
+| **Referential Integrity**| Low (Risk of breaking foreign keys) | **High (Foreign keys remain intact)** |
+| **Audit Trails** | Low (Permanently erases data) | **High (Preserves historical log indicators)** |
+| **Data Cleanup** | **High** (Reclaims disk space instantly) | Low (Keeps rows, requiring archiving jobs) |
+
+### Final Decision & Rationale
+We chose **Option B (Soft-deletion)**. Preserving relational links (e.g. read pointers in `room_members`) is crucial to prevent foreign key errors. Setting `is_deleted = TRUE` and clearing content/attachments keeps database history coherent while respecting user deletion requests. For compliance, we will implement archiving tasks to compress or move older soft-deleted rows out of active operational tables.

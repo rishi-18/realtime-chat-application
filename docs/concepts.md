@@ -135,3 +135,23 @@ Modern real-time systems handle file and media attachments securely using decoup
     - **Local Block Storage**: Uploads are saved to the server's local file system (e.g., `/var/www/uploads`). It is simple to implement but has severe horizontal limitations (instances in a cluster do not share storage, and local disks are ephemeral).
     - **Cloud Object Storage (S3)**: Files are written directly to S3 or Google Cloud Storage. Gateways generate **Pre-signed URLs** allowing clients to upload directly to S3 buckets, bypassing the application server to eliminate bandwidth bottlenecks.
 4.  **CDN Integration**: Attachment URLs reference a Content Delivery Network (e.g., CloudFront, Cloudflare) rather than raw S3 buckets, caching media at edge caches globally for sub-millisecond download times.
+
+---
+
+## 10. Soft-Deletion vs. Hard-Deletion Trade-offs & Row-Level Validation
+
+### 1. Soft-Deletion vs. Hard-Deletion
+When a user deletes a message, we must decide how to handle the data:
+-   **Hard-Deletion**: Runs `DELETE FROM messages WHERE id = :id`.
+    - *Pros*: Reclaims disk space instantly.
+    - *Cons*: Destroys relational integrity. If other tables reference this message ID (such as `room_members.last_read_message_id`), foreign key checks fail or set fields to null. It also makes tracking compliance history impossible.
+-   **Soft-Deletion**: Sets `is_deleted = TRUE` and nullifies content/attachments.
+    - *Pros*: Relational database references remain intact. Chat histories display "This message was deleted" cleanly without breaking sequential pagination indices.
+    - *Cons*: Retains rows in database indexes (though index sizes are negligible for soft-deleted flags).
+
+### 2. Row-Level Ownership Validation
+To prevent unauthorized users from editing or deleting peer messages, the service enforces row-level ownership:
+1.  Query target message entity.
+2.  Compare message sender ID against caller's authenticated user ID.
+3.  If they do not match, throw `AccessDeniedException` (caught by the handler, returning `403 Forbidden`).
+4.  Only execute transaction updates if validation succeeds.

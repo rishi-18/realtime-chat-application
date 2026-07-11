@@ -40,7 +40,14 @@ public class Message {
     @Builder.Default
     private java.util.List<MessageAttachment> attachments = new java.util.ArrayList<>();
 
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private boolean isDeleted = false;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 }

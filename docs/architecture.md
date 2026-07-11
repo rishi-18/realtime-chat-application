@@ -92,3 +92,10 @@ graph TD
 - The file is saved to the local file system (or object storage).
 - The server returns the media URL and metadata.
 - When the client sends the message via WebSocket, it includes the media URL, linking the attachment to the chat log.
+
+### 8. Message Editing & Deletion (REST Trigger + WebSocket Sync)
+- A user triggers a message update or deletion via REST endpoints (`PUT/DELETE /api/v1/messages/{messageId}`).
+- The server validates ownership of the target message (caller must be the original sender).
+- On edit: content is modified, and the `updatedAt` field is set.
+- On delete: the message is soft-deleted by setting the `content = null` and raising an `is_deleted` flag, preserving relational receipts.
+- The server broadcasts the update payload to `/topic/room.{roomId}`. Peer clients receive this frame and update their local message UI state in real-time.

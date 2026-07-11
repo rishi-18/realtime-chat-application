@@ -120,6 +120,36 @@ Uploads a file or image to be attached to a message.
 *   **Errors**:
     - `400 Bad Request`: `BAD_REQUEST` (File size exceeds limit or unsupported file type).
 
+### Edit Message
+Modifies the text content of a message. Only the sender can perform this action.
+*   **Route**: `PUT /messages/{messageId}`
+*   **Authentication**: Required (Valid Access Token)
+*   **Request Payload**:
+    ```json
+    {
+      "content": "Updated chat content"
+    }
+    ```
+*   **Success Response (`200 OK`)**: MessageResponse containing updated fields, with `isEdited` flag set.
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not the sender of the message).
+    - `404 Not Found`: `MESSAGE_NOT_FOUND` (Message does not exist).
+
+### Delete Message
+Soft-deletes a message. Content is removed, attachments are detached, and the `isDeleted` flag is raised. Only the sender can perform this action.
+*   **Route**: `DELETE /messages/{messageId}`
+*   **Authentication**: Required (Valid Access Token)
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "success": true,
+      "message": "Message deleted successfully."
+    }
+    ```
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not the sender of the message).
+    - `404 Not Found`: `MESSAGE_NOT_FOUND` (Message does not exist).
+
 ### Fetch Message History (Paginated)
 Retrieves historical messages for a room, ordered by creation date descending.
 *   **Route**: `GET /rooms/{roomId}/messages`

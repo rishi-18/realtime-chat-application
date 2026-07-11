@@ -47,15 +47,17 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
 ---
 
 ## 5. Message Entity
-- **Purpose**: Represents a text message sent within a room, optionally containing file attachments.
+- **Purpose**: Represents a text message sent within a room, optionally containing file attachments. Supports soft-deletes and tracking edits.
 - **Properties**:
   - `id`: UUID Primary Key, auto-generated.
   - `room`: Lazy `Room` reference (Cascade deletion when room is deleted).
   - `sender`: Lazy `User` reference (Mapped with `ON DELETE SET NULL` to preserve message logs if user is deleted).
-  - `content`: TEXT column, nullable (if attachments are present).
+  - `content`: TEXT column, nullable (if attachments are present, or if message has been soft-deleted).
+  - `isDeleted`: BOOLEAN column, defaults to false.
   - `attachments`: One-to-Many relationship (`List<MessageAttachment>`), eagerly loaded or fetched as needed, with cascade operations enabled.
   - `createdAt`: Timestamp, managed by JPA auditing.
-- **Validation**: `content` must be between 1 and 4000 characters if no attachments are present.
+  - `updatedAt`: Timestamp, updated when message is edited.
+- **Validation**: `content` must be between 1 and 4000 characters if no attachments are present and the message is not deleted.
 
 ---
 
