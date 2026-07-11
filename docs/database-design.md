@@ -63,6 +63,12 @@ erDiagram
         varchar emoji
         timestamp created_at
     }
+    message_mentions {
+        uuid id PK
+        uuid message_id FK
+        uuid user_id FK
+        timestamp created_at
+    }
 
     users ||--o{ refresh_tokens : "generates"
     users ||--o{ rooms : "creates"
@@ -73,6 +79,8 @@ erDiagram
     messages ||--o{ message_attachments : "contains"
     messages ||--o{ message_reactions : "has"
     users ||--o{ message_reactions : "places"
+    messages ||--o{ message_mentions : "mentions"
+    users ||--o{ message_mentions : "is_mentioned"
 ```
 
 ---
@@ -135,6 +143,18 @@ erDiagram
   - **Unique Index**: `unique_message_user_emoji` on columns `(message_id, user_id, emoji)` (prevents a user from reacting with the same emoji multiple times on a single message).
 - **Indexes**:
   - `idx_reactions_message` on column `message_id` (B-Tree). Optimized for loading reactions during message history fetches.
+
+### Table: `message_mentions`
+- **Primary Key**: `id` (UUIDv4)
+- **Foreign Keys**:
+  - `message_id` references `messages(id)` with `ON DELETE CASCADE`.
+  - `user_id` references `users(id)` with `ON DELETE CASCADE`.
+- **Columns**:
+  - `created_at` (TIMESTAMP, NOT NULL)
+- **Constraints**:
+  - **Unique Index**: `unique_message_user_mention` on columns `(message_id, user_id)` (prevents duplicate mention entries for the same user on a single message).
+- **Indexes**:
+  - `idx_mentions_user` on column `user_id` (B-Tree). Optimized for retrieving all active mentions targeting a user.
 
 ---
 

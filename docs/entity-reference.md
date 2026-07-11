@@ -85,3 +85,14 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `emoji`: VARCHAR(32) representing the emoji (Unicode representation or custom shortcode).
   - `createdAt`: Timestamp.
 - **Validation**: `emoji` must not be blank and must represent a valid Unicode sequence. Composite uniqueness constraint prevents redundant reactions.
+
+---
+
+## 8. MessageMention Entity
+- **Purpose**: Represents a user mention (`@username`) recorded inside a message.
+- **Properties**:
+  - `id`: UUID Primary Key, auto-generated.
+  - `message`: Lazy `Message` reference.
+  - `user`: Lazy `User` reference.
+  - `createdAt`: Timestamp.
+- **Validation**: Composite unique constraint ensures a user is not listed as mentioned multiple times on the same message. Only valid channel members can be mentioned.

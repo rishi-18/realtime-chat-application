@@ -75,7 +75,7 @@ class MessageControllerTest {
 
         when(messageService.saveMessage(any(MessageSendRequest.class), eq(userId))).thenReturn(message);
         when(messageService.mapToResponse(any(Message.class))).thenCallRealMethod();
-        when(messageService.mapToResponse(any(Message.class), any())).thenCallRealMethod();
+        when(messageService.mapToResponse(any(Message.class), any(), any())).thenCallRealMethod();
 
         // Act
         messageController.sendMessage(request, mockPrincipal);

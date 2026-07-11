@@ -331,3 +331,17 @@ When a user reads messages in a room, the client publishes their read marker:
       "timestamp": "2026-07-11T04:15:00Z"
     }
     ```
+
+### 7. Private User Notifications (@Mentions)
+When a user is mentioned in a message, they receive a private real-time notification sync frame on their unique user queue.
+*   **Broadcast Destination**: `/user/queue/notifications`
+*   **Broadcast Frame**:
+    ```json
+    {
+      "messageId": "76161474-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "roomId": "e3b0c442-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "senderUsername": "senderuser",
+      "type": "MENTION",
+      "snippet": "hello @targetuser!"
+    }
+    ```

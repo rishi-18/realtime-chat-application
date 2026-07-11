@@ -199,3 +199,25 @@ For extremely high-scale applications, GIN write penalties (GIN indexes are slow
 2.  Stream insert events to a Kafka topic.
 3.  Ingest logs into **Elasticsearch**.
 4.  Clients route search requests to Elasticsearch, offloading search queries entirely from the primary relational database.
+
+---
+
+## 13. User Mentions & Private Socket Notifications
+
+Mentions provide real-time user notification hooks. Designing mentions requires resolving parser strategies and notification security:
+
+### 1. Mentions Parsing: Server-side Regex vs Client-side Arrays
+When a user sends a message containing `@username`, we must extract the username target:
+-   **Client-Side Array Injection**: The client parses the text, resolves user IDs, and submits them as an explicit array property in the request payload.
+    - *Cons*: High security risk. A malicious client could manipulate the IDs array to notify users who are not mentioned in the text body, or bypass validation checks entirely.
+-   **Server-Side Regex Extraction [Chosen]**: The server acts as the source of truth, scanning the text using a strict regex: `(?<=^|(?<=\s))@([a-zA-Z0-9_]{3,30})`.
+    - *Pros*: Completely secure. Ensures only users explicitly typed in the text can be registered as mentioned.
+
+### 2. Room Membership Validations
+Mentions can leak channel existence. If a user in private Room A mentions a user who is not a member of Room A, does the target user get a notification?
+-   *Mitigation*: The backend must validate that the mentioned user exists **and** is a joined member of the target channel room before persisting the mention or issuing notifications, preventing private channel leak vectors.
+
+### 3. Private WebSocket Notification Routing
+Standard room updates are broadcast to public channel topics `/topic/room.{roomId}` subscribers. Mentions, however, require private delivery to the targeted user:
+-   **Spring Security Destination Mapping**: We use Spring's `messagingTemplate.convertAndSendToUser(username, "/queue/notifications", payload)` which transparently prefix-maps the route to `/user/{username}/queue/notifications`.
+-   This ensures only the authenticated target user can subscribe to or receive their notifications stream.

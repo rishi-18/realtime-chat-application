@@ -21,6 +21,7 @@ public class MessageResponse {
     private String content;
     private java.util.List<AttachmentResponse> attachments;
     private java.util.List<ReactionResponse> reactions;
+    private java.util.List<String> mentionedUsernames;
     private boolean isDeleted;
     private Instant timestamp;
     private Instant updatedAt;

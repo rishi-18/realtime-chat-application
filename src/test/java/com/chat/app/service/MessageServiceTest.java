@@ -46,6 +46,12 @@ class MessageServiceTest {
     @Mock
     private com.chat.app.repository.MessageReactionRepository messageReactionRepository;
 
+    @Mock
+    private com.chat.app.repository.MessageMentionRepository messageMentionRepository;
+
+    @Mock
+    private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+
     @InjectMocks
     private MessageService messageService;
 
@@ -387,5 +393,73 @@ class MessageServiceTest {
         // Act & Assert
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> messageService.searchRoomMessages(roomId, sender.getId(), "test", 0, 10));
+    }
+
+    @Test
+    void saveMessage_WithMentions_SavesMentionAndTriggersNotification() {
+        // Arrange
+        UUID roomId = room.getId();
+        User targetUser = User.builder()
+                .id(UUID.randomUUID())
+                .username("targetuser")
+                .email("target@example.com")
+                .build();
+
+        MessageSendRequest request = MessageSendRequest.builder()
+                .roomId(roomId)
+                .content("hello @targetuser how are you?")
+                .build();
+
+        when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.getId())).thenReturn(true);
+        when(userRepository.findByUsername("targetuser")).thenReturn(Optional.of(targetUser));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, targetUser.getId())).thenReturn(true);
+
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message m = invocation.getArgument(0);
+            m.setId(UUID.randomUUID());
+            return m;
+        });
+
+        // Act
+        Message result = messageService.saveMessage(request, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        verify(messageMentionRepository, times(1)).save(any(com.chat.app.model.MessageMention.class));
+        verify(messagingTemplate, times(1)).convertAndSendToUser(
+                eq("targetuser"),
+                eq("/queue/notifications"),
+                any(com.chat.app.dto.NotificationResponse.class)
+        );
+    }
+
+    @Test
+    void saveMessage_WithSelfMention_DoesNotTriggerNotification() {
+        // Arrange
+        UUID roomId = room.getId();
+        MessageSendRequest request = MessageSendRequest.builder()
+                .roomId(roomId)
+                .content("hello @sender!")
+                .build();
+
+        when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.getId())).thenReturn(true);
+
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> {
+            Message m = invocation.getArgument(0);
+            m.setId(UUID.randomUUID());
+            return m;
+        });
+
+        // Act
+        Message result = messageService.saveMessage(request, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        verify(messageMentionRepository, never()).save(any(com.chat.app.model.MessageMention.class));
+        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
     }
 }

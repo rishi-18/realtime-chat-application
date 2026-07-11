@@ -242,3 +242,25 @@ We chose **Option B (Batch Querying with In-Memory grouping)**. While Option A f
 
 ### Final Decision & Rationale
 We chose **Option B (PostgreSQL Native Full-Text Search with GIN Index)**. For our current scale and development velocity, setting up a standalone Elasticsearch cluster and a Kafka/CDC sync pipeline represents excessive engineering overhead. Native PostgreSQL FTS with GIN indexes meets all response-time SLA bounds, simplifies deployments, and ensures immediate transactional search visibility. As the application grows to hundreds of millions of rows, we will scale out by migrating to Option A via async stream replication.
+
+---
+
+## Decision 14: User Mentions Extraction Parsing Strategy
+
+- **Context**: Deciding how to extract `@username` tokens to store mentions on message dispatch.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Client-side parsing with ID arrays in REST payloads [Rejected]**.
+  - **Option B: Server-side regex parsing of message content [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Client IDs) | Option B (Server Regex) [Chosen] |
+| :--- | :--- | :--- |
+| **Tamper Resistance**| Low (Clients can forge target IDs) | **High (Server controls parsing logic)** |
+| **API Cleanliness** | Low (Payloads must bundle custom arrays) | **High (Payloads remain simple strings)** |
+| **Server CPU load** | **Low** (No text scanning) | Medium-Low (Regex match evaluations on insert) |
+
+### Final Decision & Rationale
+We chose **Option B (Server-side regex parsing)**. Relying on clients to report target user IDs introduces a critical exploit vector: a user could script requests injecting arbitrary user IDs to trigger notifications without their username appearing in the message text. Doing server-side regex scans guarantees that mentions maps correspond exactly to text body patterns, keeping the payload schema simple.

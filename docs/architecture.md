@@ -112,3 +112,9 @@ graph TD
 - The server queries the database using full-text search operators against the `content` field.
 - Database index scans are executed via a GIN index on message content vector representations.
 - The server returns a paginated list of matching message DTO responses.
+
+### 11. User Mentions (@Mentions & Private Notification Syncing)
+- When a message is sent, the server parses the content for `@username` patterns.
+- For each detected username, the server verifies that the user exists and is a member of the room.
+- Verified mentions are persisted in the `message_mentions` table.
+- The server broadcasts private real-time notification alerts to each mentioned user via their secure user-specific queues `/user/queue/notifications`. Peer clients intercept this frame to trigger push updates or audio pings.

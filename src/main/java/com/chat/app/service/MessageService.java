@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class MessageService {
 
     private final MessageRepository messageRepository;
@@ -28,6 +27,25 @@ public class MessageService {
     private final RoomMemberRepository roomMemberRepository;
     private final UserRepository userRepository;
     private final com.chat.app.repository.MessageReactionRepository messageReactionRepository;
+    private final com.chat.app.repository.MessageMentionRepository messageMentionRepository;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+
+    public MessageService(
+            MessageRepository messageRepository,
+            RoomRepository roomRepository,
+            RoomMemberRepository roomMemberRepository,
+            UserRepository userRepository,
+            com.chat.app.repository.MessageReactionRepository messageReactionRepository,
+            com.chat.app.repository.MessageMentionRepository messageMentionRepository,
+            @org.springframework.context.annotation.Lazy org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
+        this.messageRepository = messageRepository;
+        this.roomRepository = roomRepository;
+        this.roomMemberRepository = roomMemberRepository;
+        this.userRepository = userRepository;
+        this.messageReactionRepository = messageReactionRepository;
+        this.messageMentionRepository = messageMentionRepository;
+        this.messagingTemplate = messagingTemplate;
+    }
 
     @Transactional
     public Message saveMessage(MessageSendRequest request, UUID senderId) {
@@ -65,14 +83,58 @@ public class MessageService {
             }
         }
 
-        return messageRepository.save(message);
+        Message savedMessage = messageRepository.save(message);
+
+        // Parse and persist mentions if text content exists
+        if (savedMessage.getContent() != null && !savedMessage.getContent().trim().isEmpty()) {
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(?<=^|(?<=\\s))@([a-zA-Z0-9_]{3,30})");
+            java.util.regex.Matcher matcher = pattern.matcher(savedMessage.getContent());
+            java.util.Set<String> extractedUsernames = new java.util.HashSet<>();
+            while (matcher.find()) {
+                extractedUsernames.add(matcher.group(1));
+            }
+
+            for (String username : extractedUsernames) {
+                if (username.equals(sender.getUsername())) {
+                    continue; // Skip self-mentions
+                }
+                userRepository.findByUsername(username).ifPresent(targetUser -> {
+                    if (roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), targetUser.getId())) {
+                        com.chat.app.model.MessageMention mention = com.chat.app.model.MessageMention.builder()
+                                .message(savedMessage)
+                                .user(targetUser)
+                                .build();
+                        messageMentionRepository.save(mention);
+
+                        // Broadcast private notifications sync frame
+                        com.chat.app.dto.NotificationResponse notification = com.chat.app.dto.NotificationResponse.builder()
+                                .messageId(savedMessage.getId())
+                                .roomId(room.getId())
+                                .senderUsername(sender.getUsername())
+                                .type("MENTION")
+                                .snippet(savedMessage.getContent())
+                                .build();
+                        messagingTemplate.convertAndSendToUser(targetUser.getUsername(), "/queue/notifications", notification);
+                    }
+                });
+            }
+        }
+
+        return savedMessage;
     }
 
     public com.chat.app.dto.MessageResponse mapToResponse(Message message) {
-        return mapToResponse(message, java.util.Collections.emptyList());
+        return mapToResponse(message, java.util.Collections.emptyList(), java.util.Collections.emptyList());
     }
 
     public com.chat.app.dto.MessageResponse mapToResponse(Message message, java.util.List<com.chat.app.model.MessageReaction> reactions) {
+        return mapToResponse(message, reactions, java.util.Collections.emptyList());
+    }
+
+    public com.chat.app.dto.MessageResponse mapToResponse(
+            Message message, 
+            java.util.List<com.chat.app.model.MessageReaction> reactions,
+            java.util.List<com.chat.app.model.MessageMention> mentions) {
         java.util.List<com.chat.app.dto.AttachmentResponse> attachments = null;
         if (message.getAttachments() != null) {
             attachments = message.getAttachments().stream()
@@ -97,6 +159,13 @@ public class MessageService {
                     .collect(java.util.stream.Collectors.toList());
         }
 
+        java.util.List<String> mentionedUsernames = null;
+        if (mentions != null && !mentions.isEmpty()) {
+            mentionedUsernames = mentions.stream()
+                    .map(m -> m.getUser().getUsername())
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
         return com.chat.app.dto.MessageResponse.builder()
                 .id(message.getId())
                 .roomId(message.getRoom().getId())
@@ -105,6 +174,7 @@ public class MessageService {
                 .content(message.getContent())
                 .attachments(attachments)
                 .reactions(reactionResponses)
+                .mentionedUsernames(mentionedUsernames)
                 .isDeleted(message.isDeleted())
                 .timestamp(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
@@ -120,15 +190,29 @@ public class MessageService {
                 .collect(java.util.stream.Collectors.toList());
 
         java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
+        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> mentionsMap = new java.util.HashMap<>();
         if (!messageIds.isEmpty()) {
             java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(messageIds);
-            reactionsMap = reactions.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
+            if (reactions != null) {
+                reactionsMap = reactions.stream()
+                        .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
+            }
+
+            java.util.List<com.chat.app.model.MessageMention> mentions = messageMentionRepository.findByMessageIdIn(messageIds);
+            if (mentions != null) {
+                mentionsMap = mentions.stream()
+                        .collect(java.util.stream.Collectors.groupingBy(m -> m.getMessage().getId()));
+            }
         }
 
         final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
+        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
 
-        return messages.map(message -> mapToResponse(message, finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList())));
+        return messages.map(message -> mapToResponse(
+                message, 
+                finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
+                finalMentionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList())
+        ));
     }
 
     @Transactional(readOnly = true)
@@ -248,14 +332,28 @@ public class MessageService {
                 .collect(java.util.stream.Collectors.toList());
 
         java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
+        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> mentionsMap = new java.util.HashMap<>();
         if (!messageIds.isEmpty()) {
             java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(messageIds);
-            reactionsMap = reactions.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
+            if (reactions != null) {
+                reactionsMap = reactions.stream()
+                        .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
+            }
+
+            java.util.List<com.chat.app.model.MessageMention> mentions = messageMentionRepository.findByMessageIdIn(messageIds);
+            if (mentions != null) {
+                mentionsMap = mentions.stream()
+                        .collect(java.util.stream.Collectors.groupingBy(m -> m.getMessage().getId()));
+            }
         }
 
         final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
+        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
 
-        return messages.map(message -> mapToResponse(message, finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList())));
+        return messages.map(message -> mapToResponse(
+                message, 
+                finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
+                finalMentionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList())
+        ));
     }
 }
