@@ -56,6 +56,13 @@ erDiagram
         bigint file_size
         timestamp created_at
     }
+    message_reactions {
+        uuid id PK
+        uuid message_id FK
+        uuid user_id FK
+        varchar emoji
+        timestamp created_at
+    }
 
     users ||--o{ refresh_tokens : "generates"
     users ||--o{ rooms : "creates"
@@ -64,6 +71,8 @@ erDiagram
     users ||--o{ messages : "sends"
     rooms ||--o{ messages : "contains"
     messages ||--o{ message_attachments : "contains"
+    messages ||--o{ message_reactions : "has"
+    users ||--o{ message_reactions : "places"
 ```
 
 ---
@@ -112,6 +121,19 @@ erDiagram
   - `file_size` (BIGINT, NOT NULL)
 - **Indexes**:
   - `idx_attachments_message` on column `message_id` (B-Tree). Optimized for retrieving attachments associated with messages.
+
+### Table: `message_reactions`
+- **Primary Key**: `id` (UUIDv4)
+- **Foreign Keys**:
+  - `message_id` references `messages(id)` with `ON DELETE CASCADE`.
+  - `user_id` references `users(id)` with `ON DELETE CASCADE`.
+- **Columns**:
+  - `emoji` (VARCHAR(32), NOT NULL)
+  - `created_at` (TIMESTAMP, NOT NULL)
+- **Constraints**:
+  - **Unique Index**: `unique_message_user_emoji` on columns `(message_id, user_id, emoji)` (prevents a user from reacting with the same emoji multiple times on a single message).
+- **Indexes**:
+  - `idx_reactions_message` on column `message_id` (B-Tree). Optimized for loading reactions during message history fetches.
 
 ---
 

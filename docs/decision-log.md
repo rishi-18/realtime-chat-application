@@ -198,3 +198,25 @@ We chose **Option B (Backend Proxy Uploads)** storing files in a local folder fo
 
 ### Final Decision & Rationale
 We chose **Option B (Soft-deletion)**. Preserving relational links (e.g. read pointers in `room_members`) is crucial to prevent foreign key errors. Setting `is_deleted = TRUE` and clearing content/attachments keeps database history coherent while respecting user deletion requests. For compliance, we will implement archiving tasks to compress or move older soft-deleted rows out of active operational tables.
+
+---
+
+## Decision 12: Message Reactions Query Aggregation
+
+- **Context**: Deciding how to retrieve and group emoji reactions when returning message history pages.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: `@OneToMany(fetch = FetchType.EAGER)` mapping [Rejected]**.
+  - **Option B: Batch Querying (`IN (:messageIds)`) with In-Memory grouping [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Eager Mappings) | Option B (Batch Query + In-Memory Map) [Chosen] |
+| :--- | :--- | :--- |
+| **Database Round-trips**| **1 query** (Uses SQL JOIN) | 2 queries (1 for messages, 1 for reactions) |
+| **Data Redundancy** | High (Cartesian product row duplicates) | **Extremely Low** (Returns flat tables) |
+| **Query Latency** | High (Database joining overhead) | **Extremely Low** (Parallel index scans) |
+
+### Final Decision & Rationale
+We chose **Option B (Batch Querying with In-Memory grouping)**. While Option A fetches everything in a single SQL query, joins containing multiple collection columns (e.g. messages with attachments AND reactions) trigger cartesian product row duplication, bloating network overhead and JVM memory. Performing a single batch query (`IN (:messageIds)`) resolves the N+1 query problem, keeping database traffic to exactly **two queries** per history request.

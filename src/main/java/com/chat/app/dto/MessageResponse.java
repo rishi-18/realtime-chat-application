@@ -20,6 +20,7 @@ public class MessageResponse {
     private String senderUsername;
     private String content;
     private java.util.List<AttachmentResponse> attachments;
+    private java.util.List<ReactionResponse> reactions;
     private boolean isDeleted;
     private Instant timestamp;
     private Instant updatedAt;

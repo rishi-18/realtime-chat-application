@@ -99,3 +99,9 @@ graph TD
 - On edit: content is modified, and the `updatedAt` field is set.
 - On delete: the message is soft-deleted by setting the `content = null` and raising an `is_deleted` flag, preserving relational receipts.
 - The server broadcasts the update payload to `/topic/room.{roomId}`. Peer clients receive this frame and update their local message UI state in real-time.
+
+### 9. Message Reactions (REST Toggle + WebSocket Sync)
+- A user adds or removes a reaction (emoji) on a message via REST endpoint `POST /api/v1/messages/{messageId}/reactions`.
+- The server validates that the user is a member of the room where the target message resides.
+- The server adds/deletes a record in the `message_reactions` table using a toggle mechanism.
+- The server issues a STOMP broadcast to `/topic/room.{roomId}` containing the message ID and updated reaction count details. Peer clients sync their UI reaction indicators in real-time.

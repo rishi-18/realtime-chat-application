@@ -72,3 +72,15 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `fileSize`: BIGINT value.
   - `createdAt`: Timestamp.
 - **Validation**: `fileUrl` and `fileName` must not be blank. `fileSize` must be greater than 0.
+
+---
+
+## 7. MessageReaction Entity
+- **Purpose**: Represents user emoji reactions placed on a message.
+- **Properties**:
+  - `id`: UUID Primary Key, auto-generated.
+  - `message`: Lazy `Message` reference.
+  - `user`: Lazy `User` reference.
+  - `emoji`: VARCHAR(32) representing the emoji (Unicode representation or custom shortcode).
+  - `createdAt`: Timestamp.
+- **Validation**: `emoji` must not be blank and must represent a valid Unicode sequence. Composite uniqueness constraint prevents redundant reactions.

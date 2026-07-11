@@ -27,6 +27,7 @@ public class MessageService {
     private final RoomRepository roomRepository;
     private final RoomMemberRepository roomMemberRepository;
     private final UserRepository userRepository;
+    private final com.chat.app.repository.MessageReactionRepository messageReactionRepository;
 
     @Transactional
     public Message saveMessage(MessageSendRequest request, UUID senderId) {
@@ -68,6 +69,10 @@ public class MessageService {
     }
 
     public com.chat.app.dto.MessageResponse mapToResponse(Message message) {
+        return mapToResponse(message, java.util.Collections.emptyList());
+    }
+
+    public com.chat.app.dto.MessageResponse mapToResponse(Message message, java.util.List<com.chat.app.model.MessageReaction> reactions) {
         java.util.List<com.chat.app.dto.AttachmentResponse> attachments = null;
         if (message.getAttachments() != null) {
             attachments = message.getAttachments().stream()
@@ -81,6 +86,17 @@ public class MessageService {
                     .collect(java.util.stream.Collectors.toList());
         }
 
+        java.util.List<com.chat.app.dto.ReactionResponse> reactionResponses = null;
+        if (reactions != null && !reactions.isEmpty()) {
+            reactionResponses = reactions.stream()
+                    .map(r -> com.chat.app.dto.ReactionResponse.builder()
+                            .userId(r.getUser().getId())
+                            .username(r.getUser().getUsername())
+                            .emoji(r.getEmoji())
+                            .build())
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
         return com.chat.app.dto.MessageResponse.builder()
                 .id(message.getId())
                 .roomId(message.getRoom().getId())
@@ -88,10 +104,31 @@ public class MessageService {
                 .senderUsername(message.getSender() != null ? message.getSender().getUsername() : "Deleted User")
                 .content(message.getContent())
                 .attachments(attachments)
+                .reactions(reactionResponses)
                 .isDeleted(message.isDeleted())
                 .timestamp(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<com.chat.app.dto.MessageResponse> getMessageHistoryResponses(UUID roomId, UUID userId, int page, int size) {
+        Page<Message> messages = getMessageHistory(roomId, userId, page, size);
+        
+        java.util.List<UUID> messageIds = messages.getContent().stream()
+                .map(Message::getId)
+                .collect(java.util.stream.Collectors.toList());
+
+        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
+        if (!messageIds.isEmpty()) {
+            java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(messageIds);
+            reactionsMap = reactions.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
+        }
+
+        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
+
+        return messages.map(message -> mapToResponse(message, finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList())));
     }
 
     @Transactional(readOnly = true)
@@ -147,5 +184,49 @@ public class MessageService {
         message.setUpdatedAt(java.time.Instant.now());
 
         return messageRepository.save(message);
+    }
+
+    @Transactional
+    public com.chat.app.dto.ReactionSyncResponse toggleReaction(UUID messageId, String emoji, UUID userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found with id: " + messageId));
+
+        if (message.isDeleted()) {
+            throw new IllegalArgumentException("Cannot react to a soft-deleted message.");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+
+        // Enforce membership constraint
+        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(message.getRoom().getId(), userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Cannot react to message. You are not a member of this room.");
+        }
+
+        java.util.Optional<com.chat.app.model.MessageReaction> existing =
+                messageReactionRepository.findByMessageIdAndUserIdAndEmoji(messageId, userId, emoji);
+
+        String action;
+        if (existing.isPresent()) {
+            messageReactionRepository.delete(existing.get());
+            action = "REMOVED";
+        } else {
+            com.chat.app.model.MessageReaction reaction = com.chat.app.model.MessageReaction.builder()
+                    .message(message)
+                    .user(user)
+                    .emoji(emoji)
+                    .build();
+            messageReactionRepository.save(reaction);
+            action = "ADDED";
+        }
+
+        return com.chat.app.dto.ReactionSyncResponse.builder()
+                .messageId(messageId)
+                .roomId(message.getRoom().getId())
+                .emoji(emoji)
+                .action(action)
+                .userId(userId)
+                .username(user.getUsername())
+                .build();
     }
 }

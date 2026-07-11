@@ -155,3 +155,21 @@ To prevent unauthorized users from editing or deleting peer messages, the servic
 2.  Compare message sender ID against caller's authenticated user ID.
 3.  If they do not match, throw `AccessDeniedException` (caught by the handler, returning `403 Forbidden`).
 4.  Only execute transaction updates if validation succeeds.
+
+---
+
+## 11. Emoji Validation & Batch Query Aggregations
+
+Adding support for emoji reactions introduces several backend performance and input validation design challenges:
+
+### 1. Emoji Validation
+Validation of emojis must be robust. If users can react with arbitrary strings, they can execute SQL injections, inject JavaScript, or spam with long strings.
+-   *Mitigation*: Enforce a strict regex boundary. Valid emojis are matched against the standard Unicode Emoji Regex or Unicode character code sequences. Length is constrained to a maximum of 32 characters (supporting complex composite emojis with zero-width joiners like 🧑‍💻).
+
+### 2. Query Aggregation: Resolving the N+1 Query Problem
+When clients retrieve the message history of a room (e.g. 50 messages), the server must return the reactions associated with each message:
+-   **N+1 Query (Problem)**: Querying reactions independently for each message forces 1 query for history and 50 additional queries to fetch reactions. At scale, this quickly saturates the database connection pool.
+-   **Eager Fetch Join (Problem)**: Using `@OneToMany(fetch = FetchType.EAGER)` creates cartesian product row expansions if a message contains multiple attachments AND reactions, creating duplicates and high network overhead.
+-   **Centralized Batch Querying (Solution)**: Fetch the 50 messages first. Collect their IDs. Perform a single batch query to retrieve all reactions:
+    `SELECT r FROM MessageReaction r WHERE r.message.id IN (:messageIds)`
+    Group the results by message ID in memory using a Java `Map<UUID, List<MessageReaction>>` before transforming them to DTOs. This reduces the database round-trips to exactly **two queries** regardless of the page size, achieving $O(1)$ query aggregation scalability.

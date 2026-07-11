@@ -77,8 +77,7 @@ public class RoomController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         // Guard against memory-exhaustion (OOM) vector: ceiling cap maximum page size to 100
         int sanitizedSize = Math.max(1, Math.min(size, 100));
-        Page<Message> messages = messageService.getMessageHistory(roomId, userPrincipal.getId(), page, sanitizedSize);
-        Page<MessageResponse> responses = messages.map(messageService::mapToResponse);
+        Page<MessageResponse> responses = messageService.getMessageHistoryResponses(roomId, userPrincipal.getId(), page, sanitizedSize);
         return ResponseEntity.ok(responses);
     }
 

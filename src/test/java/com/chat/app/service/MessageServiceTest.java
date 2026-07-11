@@ -43,6 +43,9 @@ class MessageServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.chat.app.repository.MessageReactionRepository messageReactionRepository;
+
     @InjectMocks
     private MessageService messageService;
 
@@ -282,5 +285,64 @@ class MessageServiceTest {
         assertTrue(result.isDeleted());
         assertNull(result.getContent());
         assertTrue(result.getAttachments().isEmpty());
+    }
+
+    @Test
+    void toggleReaction_AddSuccess() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        String emoji = "🚀";
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .isDeleted(false)
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+        when(messageReactionRepository.findByMessageIdAndUserIdAndEmoji(messageId, sender.getId(), emoji))
+                .thenReturn(Optional.empty());
+
+        // Act
+        com.chat.app.dto.ReactionSyncResponse result = messageService.toggleReaction(messageId, emoji, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("ADDED", result.getAction());
+        assertEquals(emoji, result.getEmoji());
+        verify(messageReactionRepository, times(1)).save(any(com.chat.app.model.MessageReaction.class));
+    }
+
+    @Test
+    void toggleReaction_RemoveSuccess() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        String emoji = "🚀";
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .isDeleted(false)
+                .build();
+        com.chat.app.model.MessageReaction reaction = com.chat.app.model.MessageReaction.builder()
+                .id(UUID.randomUUID())
+                .message(message)
+                .user(sender)
+                .emoji(emoji)
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+        when(messageReactionRepository.findByMessageIdAndUserIdAndEmoji(messageId, sender.getId(), emoji))
+                .thenReturn(Optional.of(reaction));
+
+        // Act
+        com.chat.app.dto.ReactionSyncResponse result = messageService.toggleReaction(messageId, emoji, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("REMOVED", result.getAction());
+        verify(messageReactionRepository, times(1)).delete(any(com.chat.app.model.MessageReaction.class));
     }
 }

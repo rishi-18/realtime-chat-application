@@ -150,6 +150,31 @@ Soft-deletes a message. Content is removed, attachments are detached, and the `i
     - `403 Forbidden`: `ACCESS_DENIED` (User is not the sender of the message).
     - `404 Not Found`: `MESSAGE_NOT_FOUND` (Message does not exist).
 
+### Toggle Message Reaction
+Toggles (adds or removes) an emoji reaction on a message. The user must be a member of the room where the message is located.
+*   **Route**: `POST /messages/{messageId}/reactions`
+*   **Authentication**: Required (Valid Access Token)
+*   **Request Payload**:
+    ```json
+    {
+      "emoji": "🚀"
+    }
+    ```
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "messageId": "76161474-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "emoji": "🚀",
+      "action": "ADDED", // or "REMOVED"
+      "userId": "d2b2b4bc-a1cd-44b5-9624-383a440ab8d2",
+      "username": "testuser"
+    }
+    ```
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not a member of the room).
+    - `404 Not Found`: `MESSAGE_NOT_FOUND` (Message does not exist).
+    - `400 Bad Request`: `BAD_REQUEST` (Invalid emoji character payload).
+
 ### Fetch Message History (Paginated)
 Retrieves historical messages for a room, ordered by creation date descending.
 *   **Route**: `GET /rooms/{roomId}/messages`
