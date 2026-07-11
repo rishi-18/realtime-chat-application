@@ -20,6 +20,12 @@ import java.util.UUID;
 @Slf4j
 public class MediaController {
 
+    private final com.chat.app.service.S3Service s3Service;
+
+    public MediaController(com.chat.app.service.S3Service s3Service) {
+        this.s3Service = s3Service;
+    }
+
     private static final String UPLOAD_DIR = "uploads";
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     private static final List<String> PERMITTED_TYPES = List.of(
@@ -72,5 +78,18 @@ public class MediaController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponse(false, "Internal server error during file upload."));
         }
+    }
+
+    @PostMapping("/pre-signed-url")
+    public ResponseEntity<?> getPreSignedUrl(@RequestBody @jakarta.validation.Valid com.chat.app.dto.PreSignedUrlRequest request) {
+        log.info("Request received to generate pre-signed upload URL for file: {}", request.getFileName());
+        
+        String contentType = request.getContentType();
+        if (contentType == null || !PERMITTED_TYPES.contains(contentType.toLowerCase())) {
+            return ResponseEntity.badRequest().body(new ApiResponse(false, "Unsupported file content type: " + contentType));
+        }
+
+        com.chat.app.dto.PreSignedUrlResponse response = s3Service.generatePreSignedUrl(request.getFileName(), contentType);
+        return ResponseEntity.ok(response);
     }
 }

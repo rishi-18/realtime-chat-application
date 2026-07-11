@@ -381,3 +381,24 @@ Redis Pub/Sub allows nodes to publish messages to a channel and subscribe to rec
 
 ### 3. Serialization and Deserialization Protocol
 Since Redis channels handle raw bytes or strings, we serialize DTO objects (like `MessageResponse`) to JSON before publishing. The receiving nodes deserialize the JSON back into Java objects before broadcasting them over the WebSocket connection. This ensures compatibility across instances.
+
+---
+
+## 20. Direct-to-Cloud Uploads & S3 Pre-signed Tokens
+
+Standard file uploads process raw byte streams through application servers. For high-volume chats (e.g. sharing image/video files), this has negative performance impacts:
+*   Saturates backend instance network capacity.
+*   Exhausts application memory buffers.
+*   Blocks the thread pools of stateless WebSocket servers.
+
+### 1. Direct Upload Flow (Pre-signed PUT URLs)
+To avoid server saturation, we offload file uploads directly to AWS S3:
+1.  **Request URL**: The client requests an upload link: `POST /api/v1/media/pre-signed-url` providing filename and content type.
+2.  **Generate Pre-signed Token**: The server verifies authentication and uses the S3 SDK to generate a pre-signed PUT URL with a short expiration (e.g., 5 minutes).
+3.  **Upload File**: The client uploads the file directly to S3 via HTTP PUT.
+4.  **Confirm Upload**: Once the upload completes, the client includes the file key in the message payload. The server records the S3 resource URL in `message_attachments`.
+
+### 2. High-Availability Fallback Strategy
+If S3 configuration credentials (bucket name, region, or access keys) are missing or invalid:
+- The server falls back to returning a local storage upload URL path.
+- The client detects this and uploads to the backend local file server. This keeps the application functional during misconfigurations or cloud service outages.

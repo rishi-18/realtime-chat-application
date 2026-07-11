@@ -468,3 +468,30 @@ When a message pin state is toggled, the server broadcasts the status change to 
       "action": "PIN"
     }
     ```
+
+---
+
+## VII. Media Upload API Specs
+
+### Request Pre-signed S3 PUT URL
+Generates a pre-signed URL to upload files directly to Cloud Storage (AWS S3).
+*   **Route**: `POST /api/v1/media/pre-signed-url`
+*   **Authentication**: Required (Valid Access Token)
+*   **Request Body**:
+    - `fileName` (string, required): Original filename (e.g. `avatar.jpg`).
+    - `contentType` (string, required): Mime-type format (e.g. `image/jpeg`).
+    ```json
+    {
+      "fileName": "avatar.jpg",
+      "contentType": "image/jpeg"
+    }
+    ```
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "uploadUrl": "https://chat-app-media.s3.amazonaws.com/uploads/12345-avatar.jpg?AWSAccessKeyId=...",
+      "fileUrl": "https://cdn.chat-app.com/uploads/12345-avatar.jpg"
+    }
+    ```
+*   **Errors**:
+    - `400 Bad Request`: Validation failure on parameters or mime types.

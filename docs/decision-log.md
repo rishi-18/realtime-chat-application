@@ -396,3 +396,25 @@ We chose **Option B (MessageRevision Entity)**. While Hibernate Envers is useful
 
 ### Final Decision & Rationale
 We chose **Option B (Redis Pub/Sub)**. Real-time chat features like typing alerts, presence, and message relays are transient and do not require disk-backed persistence (messages are already saved to PostgreSQL). Redis Pub/Sub runs in-memory and has sub-millisecond latency. Since most chat apps already use Redis for caching and presence, using it for Pub/Sub adds no new infrastructure overhead, making it the most cost-effective and performant choice.
+
+---
+
+## Decision 21: Cloud Storage Upload Architecture Pattern
+
+- **Context**: Choosing the file upload pattern to prevent application server bandwidth saturation.
+- **Date**: 2026-07-12
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Backend Upload Proxying (Stream proxy to disk/S3) [Rejected]**.
+  - **Option B: Pre-signed PUT S3 URLs (Direct to Cloud Upload) [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Backend Upload Proxying) | Option B (Pre-signed PUT S3 URLs) [Chosen] |
+| :--- | :--- | :--- |
+| **Server Bandwidth Overhead** | High (Proxies binary data stream) | **None** (Binary stream goes direct to S3) |
+| **Server Memory Footprint** | High (Buffers file byte chunks) | **None** (No buffering needed) |
+| **Validation Capability** | High (Inspects content type and size dynamically) | Medium-High (Pre-signs content type and size limits) |
+
+### Final Decision & Rationale
+We chose **Option B (Pre-signed PUT S3 URLs)**. Direct client-to-S3 uploads avoid proxying large media files through backend instances, saving CPU, memory, and network resources. The backend remains lightweight and stateless, generating pre-signed tokens while offloading binary data transfers to S3. To keep local development simple, we implement a fallback to local uploads if S3 credentials are not configured.

@@ -213,3 +213,5 @@ erDiagram
     - We use `@Transactional(readOnly = true)` for read-only actions (like fetching message lists or checking memberships). This disables Hibernate's automatic dirty checking of loaded entities, reducing CPU overhead and connection hold times.
 4.  **Stateless Redis Pub/Sub Relay**:
     - Real-time message events are routed asynchronously via Redis Pub/Sub channels outside of database transactions. This ensures that database write locks are released immediately and do not block the delivery of real-time events.
+5.  **Direct S3 Attachment URI Mapping**:
+    - Pre-signed upload workflows do not write transient binary state data to PostgreSQL. S3 upload completes entirely on AWS infrastructure, and only the final immutable CDN link string is persisted to `message_attachments(file_url)`, keeping transactional read/write bounds clean.

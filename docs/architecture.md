@@ -158,3 +158,10 @@ graph TD
 - When a node receives a WebSocket message on `/app/chat.sendMessage`, it processes the transaction, saves it to the database, and publishes the event to a shared Redis channel.
 - All cluster nodes listen to this Redis channel. When they receive an event, they route the payload to any local clients subscribed to `/topic/room.{roomId}`.
 - This ensures that users receive messages in real-time, even if they are connected to different application server instances.
+
+### 18. Cloud Storage Upload Integration (AWS S3 Pre-signed URLs)
+- Uploading large media files through Spring Boot application servers saturates network bandwidth and memory.
+- S3 **Pre-signed PUT URLs** enable clients to upload files directly to Cloud Storage (AWS S3), bypassing backend instance bounds entirely.
+- The client calls `POST /api/v1/media/pre-signed-url` providing file metadata. The server generates a pre-signed S3 upload URL.
+- Local storage configurations act as fallbacks if S3 keys or credentials are not defined.
+- Once the upload completes, S3 files are delivered via CloudFront CDN routes.
