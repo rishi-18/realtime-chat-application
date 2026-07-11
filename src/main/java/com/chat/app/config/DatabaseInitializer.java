@@ -51,5 +51,14 @@ public class DatabaseInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Could not run message threading schema migrations. Error: {}", e.getMessage());
         }
+
+        log.info("Checking message_revisions table and creating indexing...");
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS message_revisions (id UUID PRIMARY KEY, message_id UUID REFERENCES messages(id) ON DELETE CASCADE, old_content TEXT NOT NULL, edited_at TIMESTAMP NOT NULL)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_revisions_message ON message_revisions(message_id)");
+            log.info("Message revisions table schema and indexing configured successfully.");
+        } catch (Exception e) {
+            log.warn("Could not run message revisions schema migrations. Error: {}", e.getMessage());
+        }
     }
 }

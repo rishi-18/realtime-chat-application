@@ -148,4 +148,24 @@ class MessageControllerRESTTest {
                 .andExpect(jsonPath("$[0].content").value("reply content"))
                 .andExpect(jsonPath("$[0].parentMessageId").value(messageId.toString()));
     }
+
+    @Test
+    void getMessageEditHistory_Success() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        com.chat.app.dto.MessageRevisionResponse revisionResponse = com.chat.app.dto.MessageRevisionResponse.builder()
+                .id(UUID.randomUUID())
+                .messageId(messageId)
+                .oldContent("old custom content")
+                .editedAt(Instant.now())
+                .build();
+
+        when(messageService.getMessageEditHistory(eq(messageId), any(UUID.class)))
+                .thenReturn(Collections.singletonList(revisionResponse));
+
+        mockMvc.perform(get("/api/v1/messages/" + messageId + "/history")
+                        .principal(new UsernamePasswordAuthenticationToken(userPrincipal, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].oldContent").value("old custom content"))
+                .andExpect(jsonPath("$[0].messageId").value(messageId.toString()));
+    }
 }

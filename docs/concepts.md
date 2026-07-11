@@ -328,3 +328,27 @@ When a new DM room is created:
 Unlike public group channels, private DM channels must not be visible to third parties. We enforce this through Query Isolation:
 - `roomRepository.findByRoomType(RoomType.PUBLIC_GROUP)` lists rooms for the public directory.
 - Joined rooms are retrieved by querying the membership table: `roomMemberRepository.findRoomsJoinedByUser(userId)`. This naturally returns both public channels and private DMs the user is enrolled in, without leaking private DM channels.
+
+---
+
+## 18. Message Auditing & Revision Logs (Immutable Edit Tracking)
+
+In compliance-heavy enterprise messaging systems, updating message records directly deletes historical context. Auditing requires recording immutable snapshots of message states prior to edits.
+
+### 1. Revision Creation Trigger Flow
+When a user edits a message:
+- The service starts a read-write database transaction.
+- It fetches the current state of the message.
+- A new `MessageRevision` is created, archiving the current content (`oldContent = message.content`) and the timestamp (`editedAt = Instant.now()`).
+- The message record is then updated with the new content, and the transaction is committed.
+
+### 2. Retrieval Security Gating
+Because revisions contain historical room messages, they are subject to the same access controls as the room itself:
+- When fetching edit history for a message, the system resolves the parent message and checks the user's room membership.
+- If the user is not a member of the room, access is blocked.
+
+### 3. Relational Database Cleanups (Cascades)
+Soft-deleting a message retains the message record, meaning revision logs remain accessible.
+If a message is permanently deleted:
+- The database engine uses a foreign key constraint with `ON DELETE CASCADE` on `message_revisions.message_id` to automatically delete all related revision logs.
+- This prevents orphaned records and keeps the database clean.

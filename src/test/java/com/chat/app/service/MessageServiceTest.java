@@ -58,6 +58,9 @@ class MessageServiceTest {
     @Mock
     private com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository;
 
+    @Mock
+    private com.chat.app.repository.MessageRevisionRepository messageRevisionRepository;
+
     @InjectMocks
     private MessageService messageService;
 
@@ -741,5 +744,82 @@ class MessageServiceTest {
         assertEquals(1, result.size());
         assertEquals("reply message", result.get(0).getContent());
         assertEquals(parentId, result.get(0).getParentMessageId());
+    }
+
+    @Test
+    void editMessage_SavesRevision_WhenContentChanges() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .sender(sender)
+                .content("original text")
+                .isDeleted(false)
+                .build();
+
+        com.chat.app.dto.MessageUpdateRequest request = new com.chat.app.dto.MessageUpdateRequest("updated text");
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        Message edited = messageService.editMessage(messageId, request, sender.getId());
+
+        // Assert
+        assertNotNull(edited);
+        assertEquals("updated text", edited.getContent());
+        verify(messageRevisionRepository, times(1)).save(any(com.chat.app.model.MessageRevision.class));
+    }
+
+    @Test
+    void getMessageEditHistory_Success() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .content("current text")
+                .build();
+
+        com.chat.app.model.MessageRevision revision = com.chat.app.model.MessageRevision.builder()
+                .id(UUID.randomUUID())
+                .message(message)
+                .oldContent("original text")
+                .editedAt(java.time.Instant.now())
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+        when(messageRevisionRepository.findByMessageIdOrderByEditedAtDesc(messageId))
+                .thenReturn(java.util.Arrays.asList(revision));
+
+        // Act
+        java.util.List<com.chat.app.dto.MessageRevisionResponse> history = messageService.getMessageEditHistory(messageId, sender.getId());
+
+        // Assert
+        assertNotNull(history);
+        assertEquals(1, history.size());
+        assertEquals("original text", history.get(0).getOldContent());
+        assertEquals(messageId, history.get(0).getMessageId());
+    }
+
+    @Test
+    void getMessageEditHistory_AccessDenied_WhenNotMember() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .content("current text")
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(false);
+
+        // Act & Assert
+        assertThrows(AccessDeniedException.class, () -> {
+            messageService.getMessageEditHistory(messageId, sender.getId());
+        });
     }
 }

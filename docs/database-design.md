@@ -78,6 +78,12 @@ erDiagram
         uuid pinned_by_user_id FK
         timestamp created_at
     }
+    message_revisions {
+        uuid id PK
+        uuid message_id FK
+        text old_content
+        timestamp edited_at
+    }
 
     users ||--o{ refresh_tokens : "generates"
     users ||--o{ rooms : "creates"
@@ -184,6 +190,16 @@ erDiagram
   - **Unique Index**: `unique_room_message_pin` on columns `(room_id, message_id)` (prevents a message from being pinned multiple times in a room).
 - **Indexes**:
   - `idx_pins_room` on column `room_id` (B-Tree). Optimized for loading pinned messages lists of a chat room.
+
+### Table: `message_revisions`
+- **Primary Key**: `id` (UUIDv4)
+- **Foreign Keys**:
+  - `message_id` references `messages(id)` with `ON DELETE CASCADE`.
+- **Columns**:
+  - `old_content` (TEXT, NOT NULL)
+  - `edited_at` (TIMESTAMP, NOT NULL)
+- **Indexes**:
+  - `idx_revisions_message` on column `message_id` (B-Tree). Optimized for retrieving revision history for a message.
 
 ---
 

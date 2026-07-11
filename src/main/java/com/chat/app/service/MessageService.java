@@ -29,6 +29,7 @@ public class MessageService {
     private final com.chat.app.repository.MessageReactionRepository messageReactionRepository;
     private final com.chat.app.repository.MessageMentionRepository messageMentionRepository;
     private final com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository;
+    private final com.chat.app.repository.MessageRevisionRepository messageRevisionRepository;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
     public MessageService(
@@ -39,6 +40,7 @@ public class MessageService {
             com.chat.app.repository.MessageReactionRepository messageReactionRepository,
             com.chat.app.repository.MessageMentionRepository messageMentionRepository,
             com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository,
+            com.chat.app.repository.MessageRevisionRepository messageRevisionRepository,
             @org.springframework.context.annotation.Lazy org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
@@ -47,6 +49,7 @@ public class MessageService {
         this.messageReactionRepository = messageReactionRepository;
         this.messageMentionRepository = messageMentionRepository;
         this.pinnedMessageRepository = pinnedMessageRepository;
+        this.messageRevisionRepository = messageRevisionRepository;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -270,6 +273,15 @@ public class MessageService {
 
         if (message.getSender() == null || !message.getSender().getId().equals(userId)) {
             throw new org.springframework.security.access.AccessDeniedException("You are not authorized to edit this message.");
+        }
+
+        if (request.getContent() != null && !request.getContent().equals(message.getContent())) {
+            com.chat.app.model.MessageRevision revision = com.chat.app.model.MessageRevision.builder()
+                    .message(message)
+                    .oldContent(message.getContent() != null ? message.getContent() : "")
+                    .editedAt(java.time.Instant.now())
+                    .build();
+            messageRevisionRepository.save(revision);
         }
 
         message.setContent(request.getContent());
@@ -578,6 +590,30 @@ public class MessageService {
                         finalMentionsMap.getOrDefault(reply.getId(), java.util.Collections.emptyList()),
                         finalPinnedMessageIds.contains(reply.getId())
                 ))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<com.chat.app.dto.MessageRevisionResponse> getMessageEditHistory(UUID messageId, UUID userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found with id: " + messageId));
+
+        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(message.getRoom().getId(), userId)) {
+            throw new AccessDeniedException("Cannot fetch edit history. You are not a member of this room.");
+        }
+
+        java.util.List<com.chat.app.model.MessageRevision> revisions = messageRevisionRepository.findByMessageIdOrderByEditedAtDesc(messageId);
+        if (revisions == null || revisions.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        return revisions.stream()
+                .map(rev -> com.chat.app.dto.MessageRevisionResponse.builder()
+                        .id(rev.getId())
+                        .messageId(messageId)
+                        .oldContent(rev.getOldContent())
+                        .editedAt(rev.getEditedAt())
+                        .build())
                 .collect(java.util.stream.Collectors.toList());
     }
 }

@@ -72,4 +72,15 @@ public class MessageControllerREST {
         java.util.List<MessageResponse> responses = messageService.getThreadReplies(messageId, userPrincipal.getId());
         return ResponseEntity.ok(responses);
     }
+
+    @GetMapping("/{messageId}/history")
+    public ResponseEntity<java.util.List<com.chat.app.dto.MessageRevisionResponse>> getMessageEditHistory(
+            @PathVariable UUID messageId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        log.info("Request received to fetch edit history for message: {} by user: {}", messageId, userPrincipal.getUsername());
+        
+        java.util.List<com.chat.app.dto.MessageRevisionResponse> responses = messageService.getMessageEditHistory(messageId, userPrincipal.getId());
+        return ResponseEntity.ok(responses);
+    }
 }

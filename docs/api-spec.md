@@ -237,6 +237,25 @@ Retrieves all reply messages belonging to a parent thread message. The user must
     - `403 Forbidden`: `ACCESS_DENIED` (User is not a member of the room).
     - `404 Not Found`: `MESSAGE_NOT_FOUND` (Parent message does not exist).
 
+### Fetch Message Edit History
+Retrieves the complete revision history log of modified contents for a message. The user must be a member of the room where the message is located.
+*   **Route**: `GET /messages/{messageId}/history`
+*   **Authentication**: Required (Valid Access Token)
+*   **Success Response (`200 OK`)**:
+    ```json
+    [
+      {
+        "id": "e3b0c442-9c0b-4ef8-bb6d-6bb9bd380a11",
+        "messageId": "76161474-9c0b-4ef8-bb6d-6bb9bd380a11",
+        "oldContent": "Original message content before edit",
+        "editedAt": "2026-07-11T12:00:00Z"
+      }
+    ]
+    ```
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not a member of the room).
+    - `404 Not Found`: `MESSAGE_NOT_FOUND` (Message does not exist).
+
 ### Fetch Message History (Paginated)
 Retrieves historical messages for a room, ordered by creation date descending.
 *   **Route**: `GET /rooms/{roomId}/messages`

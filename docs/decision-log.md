@@ -352,3 +352,25 @@ We chose **Option A (Broadcast to Room)**. While Option B reduces traffic on pee
 
 ### Final Decision & Rationale
 We chose **Option B (Lexicographical MD5 Hashing)**. Option A is unusable without changing the database schema since concatenating two 36-character UUIDs exceeds the 50-character limit of the `rooms.name` column. Changing the database schema is expensive and could break other dependencies. Option B generates a fixed 35-character alphanumeric room name (`dm-` + 32-character hex MD5). Because MD5 is deterministic, sorting the user IDs beforehand ensures the same unique name is generated regardless of who initiates the chat. This prevents duplicate DM rooms on a database level.
+
+---
+
+## Decision 19: Message Revision Auditing Strategy
+
+- **Context**: Deciding how to track message edits in the database.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Hibernate Envers/Auditing Framework integration [Rejected]**.
+  - **Option B: Standalone lightweight MessageRevision Entity [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Hibernate Envers) | Option B (MessageRevision Entity) [Chosen] |
+| :--- | :--- | :--- |
+| **Setup Complexity** | High (Requires configuration, audit tables, custom revision entities) | **Low** (Simple JPA entity and repository setup) |
+| **API Customization** | Medium (Requires querying audit tables using custom Envers APIs) | **High** (Enables standard JPQL/Spring Data JPA queries) |
+| **Application Overhead** | Medium-High (Tracks all changes and entity updates automatically) | **Low** (Only executes queries during message updates) |
+
+### Final Decision & Rationale
+We chose **Option B (MessageRevision Entity)**. While Hibernate Envers is useful for tracking all entity changes across the system, it adds unnecessary database overhead and complex queries for this feature. A simple, standalone `MessageRevision` entity allows us to use standard Spring Data JPA repositories. It only writes to the database when a message is edited, keeping database overhead low and the API straightforward.

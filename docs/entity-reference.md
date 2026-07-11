@@ -111,3 +111,14 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `pinnedBy`: Lazy `User` reference.
   - `createdAt`: Timestamp.
 - **Validation**: Target message must not be deleted. Senders must be members of the room where the message belongs. Composite unique constraint prevents duplicate pins of a message in a room.
+
+---
+
+## 10. MessageRevision Entity
+- **Purpose**: Represents an archived revision log of modified message contents.
+- **Properties**:
+  - `id`: UUID Primary Key, auto-generated.
+  - `message`: Lazy `Message` reference (Cascade deletes all logs if the message is deleted).
+  - `oldContent`: TEXT column containing the message content prior to edit.
+  - `editedAt`: Timestamp.
+- **Validation**: `oldContent` must not be blank and conforms to character limit bounds. Indexing on `message_id` optimizes historical lookup times.

@@ -145,3 +145,10 @@ graph TD
 - The system checks if a DM room already exists between the two users. If it does, the existing room is returned to prevent duplicate room creation.
 - If not, a new room with type `DIRECT_MESSAGE` is created, and both participants are automatically enrolled as room members.
 - Public directory lookups (`GET /api/v1/rooms`) exclude DM rooms to ensure privacy bounds. Clients access their active DM rooms through their joined rooms endpoint.
+
+### 16. Message Edit History (Revision Logs)
+- Message updates are tracked to maintain audit history of edited content.
+- When an edit request is received via `PUT /api/v1/messages/{messageId}`, the existing content is copied into a `message_revisions` audit record before the message record is updated.
+- Users can fetch the history of edits for a message using the REST endpoint `GET /api/v1/messages/{messageId}/history`.
+- In-memory checks verify room membership of the requesting user, securing audit access against non-member access attempts.
+- Cascading deletion rules are configured so that deleting a message automatically purges its associated audit revision logs.
