@@ -46,6 +46,17 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
         if (accessor != null) {
             StompCommand command = accessor.getCommand();
 
+            if (command != null && !StompCommand.CONNECT.equals(command)) {
+                java.util.Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+                if (sessionAttributes != null && sessionAttributes.containsKey("token_expiry")) {
+                    Long expiryTime = (Long) sessionAttributes.get("token_expiry");
+                    if (System.currentTimeMillis() > expiryTime) {
+                        log.warn("WebSocket session authentication expired. Rejecting frame: {}", command);
+                        throw new AccessDeniedException("Your session has expired. Please reconnect.");
+                    }
+                }
+            }
+
             if (StompCommand.CONNECT.equals(command)) {
                 String bearerToken = accessor.getFirstNativeHeader("Authorization");
                 log.debug("Intercepted CONNECT frame. Auth Header: {}", bearerToken);
@@ -61,6 +72,13 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
                         );
                         // Save the user details inside the STOMP session headers
                         accessor.setUser(authentication);
+
+                        java.util.Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+                        if (sessionAttributes != null) {
+                            java.util.Date expiry = tokenProvider.getTokenExpiryFromJWT(token);
+                            sessionAttributes.put("token_expiry", expiry.getTime());
+                        }
+
                         log.debug("Successfully authenticated STOMP connection for user: {}", userDetails.getUsername());
                     } else {
                         log.warn("Invalid JWT signature supplied in STOMP CONNECT frame.");

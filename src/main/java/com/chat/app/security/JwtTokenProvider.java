@@ -62,4 +62,13 @@ public class JwtTokenProvider {
         }
         return false;
     }
+
+    public java.util.Date getTokenExpiryFromJWT(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        return claims.getExpiration();
+    }
 }
