@@ -118,3 +118,10 @@ graph TD
 - For each detected username, the server verifies that the user exists and is a member of the room.
 - Verified mentions are persisted in the `message_mentions` table.
 - The server broadcasts private real-time notification alerts to each mentioned user via their secure user-specific queues `/user/queue/notifications`. Peer clients intercept this frame to trigger push updates or audio pings.
+
+### 12. Message Pins (REST Toggle + WebSocket Sync)
+- A user pins or unpins a message in a room via REST endpoint `POST /api/v1/messages/{messageId}/pin`.
+- The server validates room membership, target message existence, and that the message has not been soft-deleted.
+- Pin state changes are persisted in the `pinned_messages` table, housing pin metadata (who pinned it and when).
+- The server issues a STOMP broadcast to `/topic/room.{roomId}` syncing the pin state change across all room members' screens.
+- Room members can query all active pinned messages in a room via `GET /api/v1/rooms/{roomId}/pins` (fetching only from the `pinned_messages` join table for sub-millisecond retrieval).

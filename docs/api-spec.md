@@ -236,6 +236,34 @@ Retrieves the online status of all members of a chat room.
     ]
     ```
 
+### Toggle Message Pin
+Toggles (pins or unpins) a message in a room.
+*   **Route**: `POST /api/v1/messages/{messageId}/pin`
+*   **Authentication**: Required (Valid Access Token, User must be a member of the room where the message resides)
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "messageId": "76161474-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "roomId": "e3b0c442-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "pinned": true,
+      "pinnedByUsername": "testuser",
+      "pinnedAt": "2026-07-11T06:00:00Z"
+    }
+    ```
+*   **Errors**:
+    - `400 Bad Request`: `BAD_REQUEST` (Message is soft-deleted).
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not a member of the message's room).
+    - `404 Not Found`: `MESSAGE_NOT_FOUND` (Message does not exist).
+
+### Fetch Pinned Messages
+Retrieves all active pinned messages in a room.
+*   **Route**: `GET /api/v1/rooms/{roomId}/pins`
+*   **Authentication**: Required (Valid Access Token, User must be a room member)
+*   **Success Response (`200 OK`)**: Array of MessageResponse objects containing only currently pinned messages.
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not a member of the room).
+    - `404 Not Found`: `ROOM_NOT_FOUND` (Room does not exist).
+
 ---
 
 ## 2. WebSocket & STOMP Protocol Events
@@ -343,5 +371,19 @@ When a user is mentioned in a message, they receive a private real-time notifica
       "senderUsername": "senderuser",
       "type": "MENTION",
       "snippet": "hello @targetuser!"
+    }
+    ```
+
+### 8. Message Pin Sync Events
+When a message pin state is toggled, the server broadcasts the status change to the room subscribers.
+*   **Broadcast Destination**: `/topic/room.{roomId}`
+*   **Broadcast Frame**:
+    ```json
+    {
+      "messageId": "76161474-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "roomId": "e3b0c442-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "pinned": true,
+      "pinnedByUsername": "testuser",
+      "action": "PIN"
     }
     ```

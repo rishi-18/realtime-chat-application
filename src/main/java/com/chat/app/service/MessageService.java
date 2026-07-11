@@ -28,6 +28,7 @@ public class MessageService {
     private final UserRepository userRepository;
     private final com.chat.app.repository.MessageReactionRepository messageReactionRepository;
     private final com.chat.app.repository.MessageMentionRepository messageMentionRepository;
+    private final com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
     public MessageService(
@@ -37,6 +38,7 @@ public class MessageService {
             UserRepository userRepository,
             com.chat.app.repository.MessageReactionRepository messageReactionRepository,
             com.chat.app.repository.MessageMentionRepository messageMentionRepository,
+            com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository,
             @org.springframework.context.annotation.Lazy org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
@@ -44,6 +46,7 @@ public class MessageService {
         this.userRepository = userRepository;
         this.messageReactionRepository = messageReactionRepository;
         this.messageMentionRepository = messageMentionRepository;
+        this.pinnedMessageRepository = pinnedMessageRepository;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -124,17 +127,20 @@ public class MessageService {
     }
 
     public com.chat.app.dto.MessageResponse mapToResponse(Message message) {
-        return mapToResponse(message, java.util.Collections.emptyList(), java.util.Collections.emptyList());
+        boolean isPinned = pinnedMessageRepository.findByRoomIdAndMessageId(message.getRoom().getId(), message.getId()).isPresent();
+        return mapToResponse(message, java.util.Collections.emptyList(), java.util.Collections.emptyList(), isPinned);
     }
 
     public com.chat.app.dto.MessageResponse mapToResponse(Message message, java.util.List<com.chat.app.model.MessageReaction> reactions) {
-        return mapToResponse(message, reactions, java.util.Collections.emptyList());
+        boolean isPinned = pinnedMessageRepository.findByRoomIdAndMessageId(message.getRoom().getId(), message.getId()).isPresent();
+        return mapToResponse(message, reactions, java.util.Collections.emptyList(), isPinned);
     }
 
     public com.chat.app.dto.MessageResponse mapToResponse(
             Message message, 
             java.util.List<com.chat.app.model.MessageReaction> reactions,
-            java.util.List<com.chat.app.model.MessageMention> mentions) {
+            java.util.List<com.chat.app.model.MessageMention> mentions,
+            boolean isPinned) {
         java.util.List<com.chat.app.dto.AttachmentResponse> attachments = null;
         if (message.getAttachments() != null) {
             attachments = message.getAttachments().stream()
@@ -175,6 +181,7 @@ public class MessageService {
                 .attachments(attachments)
                 .reactions(reactionResponses)
                 .mentionedUsernames(mentionedUsernames)
+                .isPinned(isPinned)
                 .isDeleted(message.isDeleted())
                 .timestamp(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
@@ -191,6 +198,7 @@ public class MessageService {
 
         java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
         java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> mentionsMap = new java.util.HashMap<>();
+        java.util.Set<UUID> pinnedMessageIds = new java.util.HashSet<>();
         if (!messageIds.isEmpty()) {
             java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(messageIds);
             if (reactions != null) {
@@ -203,15 +211,24 @@ public class MessageService {
                 mentionsMap = mentions.stream()
                         .collect(java.util.stream.Collectors.groupingBy(m -> m.getMessage().getId()));
             }
+
+            java.util.List<com.chat.app.model.PinnedMessage> pins = pinnedMessageRepository.findByMessageIdIn(messageIds);
+            if (pins != null) {
+                pinnedMessageIds = pins.stream()
+                        .map(p -> p.getMessage().getId())
+                        .collect(java.util.stream.Collectors.toSet());
+            }
         }
 
         final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
         final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
+        final java.util.Set<UUID> finalPinnedMessageIds = pinnedMessageIds;
 
         return messages.map(message -> mapToResponse(
                 message, 
                 finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
-                finalMentionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList())
+                finalMentionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
+                finalPinnedMessageIds.contains(message.getId())
         ));
     }
 
@@ -333,6 +350,7 @@ public class MessageService {
 
         java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
         java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> mentionsMap = new java.util.HashMap<>();
+        java.util.Set<UUID> pinnedMessageIds = new java.util.HashSet<>();
         if (!messageIds.isEmpty()) {
             java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(messageIds);
             if (reactions != null) {
@@ -345,15 +363,131 @@ public class MessageService {
                 mentionsMap = mentions.stream()
                         .collect(java.util.stream.Collectors.groupingBy(m -> m.getMessage().getId()));
             }
+
+            java.util.List<com.chat.app.model.PinnedMessage> pins = pinnedMessageRepository.findByMessageIdIn(messageIds);
+            if (pins != null) {
+                pinnedMessageIds = pins.stream()
+                        .map(p -> p.getMessage().getId())
+                        .collect(java.util.stream.Collectors.toSet());
+            }
+        }
+
+        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
+        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
+        final java.util.Set<UUID> finalPinnedMessageIds = pinnedMessageIds;
+
+        return messages.map(message -> mapToResponse(
+                message, 
+                finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
+                finalMentionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
+                finalPinnedMessageIds.contains(message.getId())
+        ));
+    }
+
+    @Transactional
+    public com.chat.app.dto.PinToggleResponse togglePinMessage(UUID messageId, UUID userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found with id: " + messageId));
+
+        if (message.isDeleted()) {
+            throw new IllegalArgumentException("Cannot pin a soft-deleted message.");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+
+        UUID roomId = message.getRoom().getId();
+        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
+            throw new AccessDeniedException("Cannot pin message. You are not a member of this room.");
+        }
+
+        java.util.Optional<com.chat.app.model.PinnedMessage> existingPin = 
+                pinnedMessageRepository.findByRoomIdAndMessageId(roomId, messageId);
+
+        boolean pinned;
+        String action;
+        java.time.Instant pinnedAt;
+
+        if (existingPin.isPresent()) {
+            pinnedMessageRepository.delete(existingPin.get());
+            pinned = false;
+            action = "UNPIN";
+            pinnedAt = null;
+        } else {
+            com.chat.app.model.PinnedMessage pin = com.chat.app.model.PinnedMessage.builder()
+                    .message(message)
+                    .room(message.getRoom())
+                    .pinnedBy(user)
+                    .build();
+            pinnedMessageRepository.save(pin);
+            pinned = true;
+            action = "PIN";
+            pinnedAt = java.time.Instant.now();
+        }
+
+        // Broadcast WebSocket sync event
+        com.chat.app.dto.PinSyncResponse syncPayload = com.chat.app.dto.PinSyncResponse.builder()
+                .messageId(messageId)
+                .roomId(roomId)
+                .pinned(pinned)
+                .pinnedByUsername(user.getUsername())
+                .action(action)
+                .build();
+        messagingTemplate.convertAndSend("/topic/room." + roomId, syncPayload);
+
+        return com.chat.app.dto.PinToggleResponse.builder()
+                .messageId(messageId)
+                .roomId(roomId)
+                .pinned(pinned)
+                .pinnedByUsername(user.getUsername())
+                .pinnedAt(pinnedAt)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<com.chat.app.dto.MessageResponse> getPinnedMessages(UUID roomId, UUID userId) {
+        if (!roomRepository.existsById(roomId)) {
+            throw new RoomNotFoundException("Room not found with id: " + roomId);
+        }
+
+        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
+            throw new AccessDeniedException("Cannot fetch pinned messages. You are not a member of this room.");
+        }
+
+        java.util.List<com.chat.app.model.PinnedMessage> pins = pinnedMessageRepository.findByRoomId(roomId);
+        if (pins == null || pins.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        java.util.List<UUID> messageIds = pins.stream()
+                .map(p -> p.getMessage().getId())
+                .collect(java.util.stream.Collectors.toList());
+
+        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
+        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> mentionsMap = new java.util.HashMap<>();
+        
+        java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(messageIds);
+        if (reactions != null) {
+            reactionsMap = reactions.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
+        }
+
+        java.util.List<com.chat.app.model.MessageMention> mentions = messageMentionRepository.findByMessageIdIn(messageIds);
+        if (mentions != null) {
+            mentionsMap = mentions.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(m -> m.getMessage().getId()));
         }
 
         final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
         final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
 
-        return messages.map(message -> mapToResponse(
-                message, 
-                finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
-                finalMentionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList())
-        ));
+        return pins.stream()
+                .map(pin -> mapToResponse(
+                        pin.getMessage(),
+                        finalReactionsMap.getOrDefault(pin.getMessage().getId(), java.util.Collections.emptyList()),
+                        finalMentionsMap.getOrDefault(pin.getMessage().getId(), java.util.Collections.emptyList()),
+                        true
+                ))
+                .collect(java.util.stream.Collectors.toList());
     }
 }

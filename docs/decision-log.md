@@ -264,3 +264,25 @@ We chose **Option B (PostgreSQL Native Full-Text Search with GIN Index)**. For o
 
 ### Final Decision & Rationale
 We chose **Option B (Server-side regex parsing)**. Relying on clients to report target user IDs introduces a critical exploit vector: a user could script requests injecting arbitrary user IDs to trigger notifications without their username appearing in the message text. Doing server-side regex scans guarantees that mentions maps correspond exactly to text body patterns, keeping the payload schema simple.
+
+---
+
+## Decision 15: Message Pinning Database Mappings Strategy
+
+- **Context**: Deciding how to represent pinned messages inside the database.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Add boolean column `is_pinned` directly to `messages` table [Rejected]**.
+  - **Option B: Standalone join audit table `pinned_messages` [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Boolean Flag) | Option B (Join Audit Table) [Chosen] |
+| :--- | :--- | :--- |
+| **Audit Trails Capability**| Low (Cannot store who pinned it and when) | **High (Naturally stores metadata)** |
+| **Index footprint size** | High (Requires index on huge messages table) | **Low (Index on small join table)** |
+| **Schema Complexity** | **Low** (Simple table attribute check) | Medium-Low (Requires separate Entity mapping) |
+
+### Final Decision & Rationale
+We chose **Option B (Join Audit Table)**. While Option A is slightly simpler, it fails to record critical metadata such as which user pinned the message and at what time. Furthermore, in high-traffic rooms, the total volume of pinned messages is very small compared to standard logs. Storing pins in a standalone join table ensures that lookups are localized, and indices stay small and cache-resident, optimizing database query read performance.

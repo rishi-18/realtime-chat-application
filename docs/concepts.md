@@ -221,3 +221,25 @@ Mentions can leak channel existence. If a user in private Room A mentions a user
 Standard room updates are broadcast to public channel topics `/topic/room.{roomId}` subscribers. Mentions, however, require private delivery to the targeted user:
 -   **Spring Security Destination Mapping**: We use Spring's `messagingTemplate.convertAndSendToUser(username, "/queue/notifications", payload)` which transparently prefix-maps the route to `/user/{username}/queue/notifications`.
 -   This ensures only the authenticated target user can subscribe to or receive their notifications stream.
+
+---
+
+## 14. Message Pinning Audit Mappings (Boolean Flag vs Audit Table)
+
+Pinning a message marks it as a key resource in a channel. Designing pinning state persistence involves trade-offs:
+
+### 1. The Entity Persistence Trade-off
+-   **Approach A: Field Flag (`messages.is_pinned`)**:
+    - Add a boolean flag column directly to the `messages` table.
+    - *Cons*: Fails to capture pin audit trail context (e.g. "Who pinned this message?", "When was it pinned?"). High index maintenance overhead when query scanning is pinned messages.
+-   **Approach B: Standalone Audit Table (`pinned_messages`) [Chosen]**:
+    - Create a distinct join entity: `id`, `message_id`, `room_id`, `pinned_by_user_id`, `created_at`.
+    - *Pros*: Complete audit trails, lightweight tables, sub-millisecond query execution on room indexes, clean database normalization.
+
+### 2. Transaction Integrity & Constraints
+- To prevent duplicate pin mappings, a composite unique index is placed on `(room_id, message_id)`.
+- When a message is soft-deleted, any associated pin records in `pinned_messages` should be deleted automatically. We enforce this using database-level `ON DELETE CASCADE` foreign keys.
+
+### 3. Room Moderation Security
+- In general messaging architectures, pins can either be open to all channel members or restricted to administrators.
+- *Implementation choice*: For public group messaging simplicity, we validate room membership checks: only users who have joined the channel room are authorized to pin or unpin room messages.

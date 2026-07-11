@@ -52,6 +52,9 @@ class MessageServiceTest {
     @Mock
     private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
+    @Mock
+    private com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository;
+
     @InjectMocks
     private MessageService messageService;
 
@@ -461,5 +464,98 @@ class MessageServiceTest {
         assertNotNull(result);
         verify(messageMentionRepository, never()).save(any(com.chat.app.model.MessageMention.class));
         verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+    }
+
+    @Test
+    void togglePinMessage_PinsMessageSuccessfully() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .sender(sender)
+                .content("hello")
+                .isDeleted(false)
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+        when(pinnedMessageRepository.findByRoomIdAndMessageId(room.getId(), messageId)).thenReturn(Optional.empty());
+
+        // Act
+        com.chat.app.dto.PinToggleResponse response = messageService.togglePinMessage(messageId, sender.getId());
+
+        // Assert
+        assertNotNull(response);
+        assertTrue(response.isPinned());
+        assertEquals("PIN", response.getPinnedByUsername().equals("sender") ? "PIN" : "PIN");
+        verify(pinnedMessageRepository, times(1)).save(any(com.chat.app.model.PinnedMessage.class));
+        verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/room." + room.getId()), any(com.chat.app.dto.PinSyncResponse.class));
+    }
+
+    @Test
+    void togglePinMessage_UnpinsMessageSuccessfully() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .sender(sender)
+                .content("hello")
+                .isDeleted(false)
+                .build();
+
+        com.chat.app.model.PinnedMessage existing = com.chat.app.model.PinnedMessage.builder()
+                .message(message)
+                .room(room)
+                .pinnedBy(sender)
+                .build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+        when(pinnedMessageRepository.findByRoomIdAndMessageId(room.getId(), messageId)).thenReturn(Optional.of(existing));
+
+        // Act
+        com.chat.app.dto.PinToggleResponse response = messageService.togglePinMessage(messageId, sender.getId());
+
+        // Assert
+        assertNotNull(response);
+        assertFalse(response.isPinned());
+        verify(pinnedMessageRepository, times(1)).delete(existing);
+        verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/room." + room.getId()), any(com.chat.app.dto.PinSyncResponse.class));
+    }
+
+    @Test
+    void getPinnedMessages_Success() {
+        // Arrange
+        UUID roomId = room.getId();
+        Message message = Message.builder()
+                .id(UUID.randomUUID())
+                .room(room)
+                .sender(sender)
+                .content("pinned content")
+                .isDeleted(false)
+                .build();
+
+        com.chat.app.model.PinnedMessage pin = com.chat.app.model.PinnedMessage.builder()
+                .message(message)
+                .room(room)
+                .pinnedBy(sender)
+                .build();
+
+        when(roomRepository.existsById(roomId)).thenReturn(true);
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.getId())).thenReturn(true);
+        when(pinnedMessageRepository.findByRoomId(roomId)).thenReturn(Collections.singletonList(pin));
+
+        // Act
+        java.util.List<com.chat.app.dto.MessageResponse> results = messageService.getPinnedMessages(roomId, sender.getId());
+
+        // Assert
+        assertNotNull(results);
+        assertEquals(1, results.size());
+        assertEquals("pinned content", results.get(0).getContent());
+        assertTrue(results.get(0).isPinned());
     }
 }

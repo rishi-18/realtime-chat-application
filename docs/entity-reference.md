@@ -96,3 +96,15 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `user`: Lazy `User` reference.
   - `createdAt`: Timestamp.
 - **Validation**: Composite unique constraint ensures a user is not listed as mentioned multiple times on the same message. Only valid channel members can be mentioned.
+
+---
+
+## 9. PinnedMessage Entity
+- **Purpose**: Represents a message pinned within a room.
+- **Properties**:
+  - `id`: UUID Primary Key, auto-generated.
+  - `message`: Lazy `Message` reference.
+  - `room`: Lazy `Room` reference.
+  - `pinnedBy`: Lazy `User` reference.
+  - `createdAt`: Timestamp.
+- **Validation**: Target message must not be deleted. Senders must be members of the room where the message belongs. Composite unique constraint prevents duplicate pins of a message in a room.

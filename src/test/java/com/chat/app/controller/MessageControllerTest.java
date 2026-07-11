@@ -73,9 +73,19 @@ class MessageControllerTest {
                 .createdAt(Instant.now())
                 .build();
 
+        MessageResponse mockResponse = MessageResponse.builder()
+                .id(message.getId())
+                .roomId(message.getRoom().getId())
+                .senderId(userId)
+                .senderUsername("testuser")
+                .content("hello world")
+                .isPinned(false)
+                .isDeleted(false)
+                .timestamp(message.getCreatedAt())
+                .build();
+
         when(messageService.saveMessage(any(MessageSendRequest.class), eq(userId))).thenReturn(message);
-        when(messageService.mapToResponse(any(Message.class))).thenCallRealMethod();
-        when(messageService.mapToResponse(any(Message.class), any(), any())).thenCallRealMethod();
+        when(messageService.mapToResponse(any(Message.class))).thenReturn(mockResponse);
 
         // Act
         messageController.sendMessage(request, mockPrincipal);

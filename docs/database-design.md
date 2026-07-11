@@ -69,6 +69,13 @@ erDiagram
         uuid user_id FK
         timestamp created_at
     }
+    pinned_messages {
+        uuid id PK
+        uuid message_id FK
+        uuid room_id FK
+        uuid pinned_by_user_id FK
+        timestamp created_at
+    }
 
     users ||--o{ refresh_tokens : "generates"
     users ||--o{ rooms : "creates"
@@ -81,6 +88,9 @@ erDiagram
     users ||--o{ message_reactions : "places"
     messages ||--o{ message_mentions : "mentions"
     users ||--o{ message_mentions : "is_mentioned"
+    rooms ||--o{ pinned_messages : "has_pinned"
+    messages ||--o{ pinned_messages : "is_pinned"
+    users ||--o{ pinned_messages : "pinned_by"
 ```
 
 ---
@@ -155,6 +165,19 @@ erDiagram
   - **Unique Index**: `unique_message_user_mention` on columns `(message_id, user_id)` (prevents duplicate mention entries for the same user on a single message).
 - **Indexes**:
   - `idx_mentions_user` on column `user_id` (B-Tree). Optimized for retrieving all active mentions targeting a user.
+
+### Table: `pinned_messages`
+- **Primary Key**: `id` (UUIDv4)
+- **Foreign Keys**:
+  - `message_id` references `messages(id)` with `ON DELETE CASCADE`.
+  - `room_id` references `rooms(id)` with `ON DELETE CASCADE`.
+  - `pinned_by_user_id` references `users(id)` with `ON DELETE CASCADE`.
+- **Columns**:
+  - `created_at` (TIMESTAMP, NOT NULL)
+- **Constraints**:
+  - **Unique Index**: `unique_room_message_pin` on columns `(room_id, message_id)` (prevents a message from being pinned multiple times in a room).
+- **Indexes**:
+  - `idx_pins_room` on column `room_id` (B-Tree). Optimized for loading pinned messages lists of a chat room.
 
 ---
 
