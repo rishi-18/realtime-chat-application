@@ -243,3 +243,30 @@ Pinning a message marks it as a key resource in a channel. Designing pinning sta
 ### 3. Room Moderation Security
 - In general messaging architectures, pins can either be open to all channel members or restricted to administrators.
 - *Implementation choice*: For public group messaging simplicity, we validate room membership checks: only users who have joined the channel room are authorized to pin or unpin room messages.
+
+---
+
+## 15. Channel Roles & Hierarchical Moderation (RBAC)
+
+When scaling group messaging channels, moderation privileges must be enforced to protect users from spam and maintain community boundaries. Rather than complex runtime role permission tables, we implement a static Bounded Context Role hierarchy:
+
+```mermaid
+graph TD
+    OWNER["OWNER (Full Admin)"] -->|Can Promote/Demote| MODERATOR["MODERATOR"]
+    OWNER -->|Can Kick| MEMBER["MEMBER"]
+    MODERATOR -->|Can Kick| MEMBER
+    MEMBER -->|Can only edit/delete own posts| MEMBER
+```
+
+### 1. Hierarchical Kick Restrictions
+To prevent privilege escalation attacks:
+- `OWNER` can promote/demote or kick anyone.
+- `MODERATOR` can kick standard `MEMBER`s.
+- `MODERATOR` CANNOT kick or change the role of the `OWNER`.
+- Standard `MEMBER`s cannot kick anyone.
+
+### 2. Cascading Moderation Deletion
+Standard API validations restrict message deletions to the author (`message.sender_id == current_user_id`). With role-based moderation:
+- When a user requests message deletion, the backend fetches their `RoomMember` association.
+- If the member holds the `OWNER` or `MODERATOR` role in that room, the sender validation check is bypassed, allowing moderators to immediately soft-delete spam.
+- Standard members are still strictly bound to deleting only their own messages.

@@ -4,6 +4,8 @@ import com.chat.app.dto.MessageSendRequest;
 import com.chat.app.exception.RoomNotFoundException;
 import com.chat.app.model.Message;
 import com.chat.app.model.Room;
+import com.chat.app.model.RoomMember;
+import com.chat.app.model.RoomMemberId;
 import com.chat.app.model.User;
 import com.chat.app.repository.MessageRepository;
 import com.chat.app.repository.RoomMemberRepository;
@@ -557,5 +559,59 @@ class MessageServiceTest {
         assertEquals(1, results.size());
         assertEquals("pinned content", results.get(0).getContent());
         assertTrue(results.get(0).isPinned());
+    }
+
+    @Test
+    void deleteMessage_Success_ByModerator() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        UUID moderatorId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .sender(sender) // sent by 'sender'
+                .content("spam content")
+                .isDeleted(false)
+                .build();
+
+        RoomMemberId membershipId = RoomMemberId.builder().roomId(room.getId()).userId(moderatorId).build();
+        RoomMember moderator = RoomMember.builder().id(membershipId).role(com.chat.app.model.RoomRole.MODERATOR).build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(roomMemberRepository.findById(membershipId)).thenReturn(Optional.of(moderator));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        Message deleted = messageService.deleteMessage(messageId, moderatorId);
+
+        // Assert
+        assertNotNull(deleted);
+        assertTrue(deleted.isDeleted());
+        assertNull(deleted.getContent());
+    }
+
+    @Test
+    void deleteMessage_Forbidden_ByMemberOnOtherSenderMessage() {
+        // Arrange
+        UUID messageId = UUID.randomUUID();
+        UUID otherMemberId = UUID.randomUUID();
+        Message message = Message.builder()
+                .id(messageId)
+                .room(room)
+                .sender(sender) // sent by 'sender'
+                .content("hello")
+                .isDeleted(false)
+                .build();
+
+        RoomMemberId membershipId = RoomMemberId.builder().roomId(room.getId()).userId(otherMemberId).build();
+        RoomMember member = RoomMember.builder().id(membershipId).role(com.chat.app.model.RoomRole.MEMBER).build();
+
+        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
+        when(roomMemberRepository.findById(membershipId)).thenReturn(Optional.of(member));
+
+        // Act & Assert
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            messageService.deleteMessage(messageId, otherMemberId);
+        });
     }
 }

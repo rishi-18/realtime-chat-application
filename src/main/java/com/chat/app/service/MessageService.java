@@ -275,7 +275,24 @@ public class MessageService {
             return message;
         }
 
-        if (message.getSender() == null || !message.getSender().getId().equals(userId)) {
+        boolean isAuthorized = false;
+        if (message.getSender() != null && message.getSender().getId().equals(userId)) {
+            isAuthorized = true;
+        } else {
+            com.chat.app.model.RoomMemberId membershipId = com.chat.app.model.RoomMemberId.builder()
+                    .roomId(message.getRoom().getId())
+                    .userId(userId)
+                    .build();
+            java.util.Optional<com.chat.app.model.RoomMember> memberOpt = roomMemberRepository.findById(membershipId);
+            if (memberOpt.isPresent()) {
+                com.chat.app.model.RoomRole role = memberOpt.get().getRole();
+                if (role == com.chat.app.model.RoomRole.OWNER || role == com.chat.app.model.RoomRole.MODERATOR) {
+                    isAuthorized = true;
+                }
+            }
+        }
+
+        if (!isAuthorized) {
             throw new org.springframework.security.access.AccessDeniedException("You are not authorized to delete this message.");
         }
 

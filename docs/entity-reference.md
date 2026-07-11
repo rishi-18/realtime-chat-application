@@ -41,8 +41,9 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `room`: Lazy `Room` entity reference.
   - `user`: Lazy `User` entity reference.
   - `lastReadMessage`: Lazy `Message` entity reference, nullable, maps the user's current read marker.
+  - `role`: Enum (`RoomRole`), stored as String (`@Enumerated(EnumType.STRING)`), NOT NULL. Values: `OWNER`, `MODERATOR`, `MEMBER`.
   - `joinedAt`: Timestamp, mapped by `@CreatedDate`.
-- **Validation**: Enforces unique primary key combinations to prevent duplicate membership records.
+- **Validation**: Enforces unique primary key combinations to prevent duplicate membership records. Role must not be null and must correspond to a valid enum classification.
 
 ---
 

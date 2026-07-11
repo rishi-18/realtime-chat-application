@@ -5,6 +5,7 @@ import com.chat.app.exception.RoomAlreadyExistsException;
 import com.chat.app.exception.RoomNotFoundException;
 import com.chat.app.model.Room;
 import com.chat.app.model.RoomMember;
+import com.chat.app.model.RoomMemberId;
 import com.chat.app.model.User;
 import com.chat.app.repository.RoomMemberRepository;
 import com.chat.app.repository.RoomRepository;
@@ -336,5 +337,95 @@ class RoomServiceTest {
         // Assert
         assertEquals(currentRead, member.getLastReadMessage());
         verify(roomMemberRepository, never()).save(any(RoomMember.class));
+    }
+
+    @Test
+    void updateMemberRole_Success() {
+        // Arrange
+        UUID roomId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID targetUserId = UUID.randomUUID();
+
+        RoomMemberId requesterId = RoomMemberId.builder().roomId(roomId).userId(ownerId).build();
+        RoomMember requester = RoomMember.builder().id(requesterId).role(com.chat.app.model.RoomRole.OWNER).build();
+
+        RoomMemberId targetId = RoomMemberId.builder().roomId(roomId).userId(targetUserId).build();
+        RoomMember target = RoomMember.builder().id(targetId).role(com.chat.app.model.RoomRole.MEMBER).build();
+
+        when(roomMemberRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+        when(roomMemberRepository.findById(targetId)).thenReturn(Optional.of(target));
+        when(roomMemberRepository.save(any(RoomMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        com.chat.app.dto.RoleUpdateResponse response = roomService.updateMemberRole(roomId, targetUserId, com.chat.app.model.RoomRole.MODERATOR, ownerId);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals("MODERATOR", response.getRole());
+        verify(roomMemberRepository, times(1)).save(target);
+    }
+
+    @Test
+    void updateMemberRole_Forbidden_WhenNotOwner() {
+        // Arrange
+        UUID roomId = UUID.randomUUID();
+        UUID requesterUserId = UUID.randomUUID();
+        UUID targetUserId = UUID.randomUUID();
+
+        RoomMemberId requesterId = RoomMemberId.builder().roomId(roomId).userId(requesterUserId).build();
+        RoomMember requester = RoomMember.builder().id(requesterId).role(com.chat.app.model.RoomRole.MEMBER).build();
+
+        when(roomMemberRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+
+        // Act & Assert
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            roomService.updateMemberRole(roomId, targetUserId, com.chat.app.model.RoomRole.MODERATOR, requesterUserId);
+        });
+    }
+
+    @Test
+    void kickMember_Success_OwnerKicksModerator() {
+        // Arrange
+        UUID roomId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID moderatorId = UUID.randomUUID();
+
+        RoomMemberId requesterId = RoomMemberId.builder().roomId(roomId).userId(ownerId).build();
+        RoomMember requester = RoomMember.builder().id(requesterId).role(com.chat.app.model.RoomRole.OWNER).build();
+
+        RoomMemberId targetId = RoomMemberId.builder().roomId(roomId).userId(moderatorId).build();
+        RoomMember target = RoomMember.builder().id(targetId).role(com.chat.app.model.RoomRole.MODERATOR).build();
+
+        when(roomMemberRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+        when(roomMemberRepository.findById(targetId)).thenReturn(Optional.of(target));
+
+        // Act
+        roomService.kickMember(roomId, moderatorId, ownerId);
+
+        // Assert
+        verify(roomMemberRepository, times(1)).delete(target);
+    }
+
+    @Test
+    void kickMember_Forbidden_ModeratorKicksOwner() {
+        // Arrange
+        UUID roomId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID moderatorId = UUID.randomUUID();
+
+        RoomMemberId requesterId = RoomMemberId.builder().roomId(roomId).userId(moderatorId).build();
+        RoomMember requester = RoomMember.builder().id(requesterId).role(com.chat.app.model.RoomRole.MODERATOR).build();
+
+        RoomMemberId targetId = RoomMemberId.builder().roomId(roomId).userId(ownerId).build();
+        RoomMember target = RoomMember.builder().id(targetId).role(com.chat.app.model.RoomRole.OWNER).build();
+
+        when(roomMemberRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+        when(roomMemberRepository.findById(targetId)).thenReturn(Optional.of(target));
+
+        // Act & Assert
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
+            roomService.kickMember(roomId, ownerId, moderatorId);
+        });
+        verify(roomMemberRepository, never()).delete(any(RoomMember.class));
     }
 }

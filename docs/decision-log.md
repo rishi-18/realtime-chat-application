@@ -286,3 +286,25 @@ We chose **Option B (Server-side regex parsing)**. Relying on clients to report 
 
 ### Final Decision & Rationale
 We chose **Option B (Join Audit Table)**. While Option A is slightly simpler, it fails to record critical metadata such as which user pinned the message and at what time. Furthermore, in high-traffic rooms, the total volume of pinned messages is very small compared to standard logs. Storing pins in a standalone join table ensures that lookups are localized, and indices stay small and cache-resident, optimizing database query read performance.
+
+---
+
+## Decision 16: Channel Role & Privilege Persistence Strategy
+
+- **Context**: Deciding how to assign and authorize channel roles and moderation privileges in room contexts.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Dynamic ACL (Access Control Lists) mapping roles to fine-grained permission codes [Rejected]**.
+  - **Option B: Static Hierarchical Roles (OWNER, MODERATOR, MEMBER) [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Dynamic ACL) | Option B (Static Hierarchical Roles) [Chosen] |
+| :--- | :--- | :--- |
+| **Implementation Complexity** | High (Requires ACL rules engine and DB permission lookups) | **Low** (Simple Java Enum comparisons) |
+| **Runtime Performance** | Medium (Requires caching rules mapping tables) | **High** (Runs inline JPA checks in $O(1)$) |
+| **System Flexibility** | **High** (Roles can have permissions added dynamically) | Low (Role boundaries are hardcoded in Java logic) |
+
+### Final Decision & Rationale
+We chose **Option B (Static Hierarchical Roles)**. For an instant messaging application, the roles of Owner, Moderator, and Member are standard and stable. Implementing a dynamic ACL system introduces unnecessary database query joins, indexing overhead, and complex maintenance logic. Defining a simple Java Enum with hierarchical checks (e.g. `role.canModerate()`) is extremely performant, easy to maintain, and meets all moderation security specifications with minimal engineering footprint.

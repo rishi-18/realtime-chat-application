@@ -121,4 +121,22 @@ public class RoomController {
                 .build();
         return ResponseEntity.ok(response);
     }
+    @PutMapping("/{roomId}/members/{userId}/role")
+    public ResponseEntity<RoleUpdateResponse> updateMemberRole(
+            @PathVariable UUID roomId,
+            @PathVariable UUID userId,
+            @Valid @RequestBody RoleUpdateRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        RoleUpdateResponse response = roomService.updateMemberRole(roomId, userId, request.getRole(), userPrincipal.getId());
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{roomId}/members/{userId}")
+    public ResponseEntity<ApiResponse> kickMember(
+            @PathVariable UUID roomId,
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        roomService.kickMember(roomId, userId, userPrincipal.getId());
+        return ResponseEntity.ok(new ApiResponse(true, "User kicked successfully."));
+    }
 }

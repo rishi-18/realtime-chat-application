@@ -36,6 +36,11 @@ public class RoomMember {
     @JoinColumn(name = "last_read_message_id")
     private Message lastReadMessage;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    @Builder.Default
+    private RoomRole role = RoomRole.MEMBER;
+
     @CreatedDate
     @Column(name = "joined_at", nullable = false, updatable = false)
     private Instant joinedAt;

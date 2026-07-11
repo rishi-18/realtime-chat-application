@@ -36,6 +36,7 @@ erDiagram
         uuid room_id PK, FK
         uuid user_id PK, FK
         uuid last_read_message_id FK
+        varchar role
         timestamp joined_at
     }
     messages {
@@ -112,6 +113,8 @@ erDiagram
   - `room_id` references `rooms(id)` with `ON DELETE CASCADE`.
   - `user_id` references `users(id)` with `ON DELETE CASCADE`.
   - `last_read_message_id` references `messages(id)` with `ON DELETE SET NULL`.
+- **Columns**:
+  - `role` (VARCHAR(30), NOT NULL, default 'MEMBER'). Stores membership role: 'OWNER', 'MODERATOR', or 'MEMBER'.
 - **Indexes**:
   - `idx_room_members_user` on column `user_id` (B-Tree). Optimized for checking which rooms a user has joined.
 

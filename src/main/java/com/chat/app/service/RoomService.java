@@ -55,6 +55,7 @@ public class RoomService {
                 .id(membershipId)
                 .room(savedRoom)
                 .user(creator)
+                .role(com.chat.app.model.RoomRole.OWNER)
                 .build();
 
         roomMemberRepository.save(membership);
@@ -88,6 +89,7 @@ public class RoomService {
                 .id(membershipId)
                 .room(room)
                 .user(user)
+                .role(com.chat.app.model.RoomRole.MEMBER)
                 .build();
 
         roomMemberRepository.save(membership);
@@ -179,5 +181,77 @@ public class RoomService {
 
         member.setLastReadMessage(message);
         roomMemberRepository.save(member);
+    }
+
+    @Transactional
+    public com.chat.app.dto.RoleUpdateResponse updateMemberRole(UUID roomId, UUID targetUserId, com.chat.app.model.RoomRole newRole, UUID requesterId) {
+        RoomMemberId requesterMembershipId = RoomMemberId.builder()
+                .roomId(roomId)
+                .userId(requesterId)
+                .build();
+
+        RoomMember requester = roomMemberRepository.findById(requesterMembershipId)
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Requester is not a member of this room."));
+
+        if (requester.getRole() != com.chat.app.model.RoomRole.OWNER) {
+            throw new org.springframework.security.access.AccessDeniedException("Only room owners can change roles.");
+        }
+
+        RoomMemberId targetMembershipId = RoomMemberId.builder()
+                .roomId(roomId)
+                .userId(targetUserId)
+                .build();
+
+        RoomMember target = roomMemberRepository.findById(targetMembershipId)
+                .orElseThrow(() -> new IllegalArgumentException("Target user is not a member of this room."));
+
+        // Single owner enforcement
+        if (targetUserId.equals(requesterId) && newRole != com.chat.app.model.RoomRole.OWNER) {
+            throw new IllegalArgumentException("Room owners cannot demote themselves.");
+        }
+
+        target.setRole(newRole);
+        RoomMember saved = roomMemberRepository.save(target);
+
+        return com.chat.app.dto.RoleUpdateResponse.builder()
+                .roomId(roomId)
+                .userId(targetUserId)
+                .role(saved.getRole().name())
+                .build();
+    }
+
+    @Transactional
+    public void kickMember(UUID roomId, UUID targetUserId, UUID requesterId) {
+        RoomMemberId requesterMembershipId = RoomMemberId.builder()
+                .roomId(roomId)
+                .userId(requesterId)
+                .build();
+
+        RoomMember requester = roomMemberRepository.findById(requesterMembershipId)
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Requester is not a member of this room."));
+
+        if (requester.getRole() != com.chat.app.model.RoomRole.OWNER && requester.getRole() != com.chat.app.model.RoomRole.MODERATOR) {
+            throw new org.springframework.security.access.AccessDeniedException("Only room owners and moderators can kick members.");
+        }
+
+        RoomMemberId targetMembershipId = RoomMemberId.builder()
+                .roomId(roomId)
+                .userId(targetUserId)
+                .build();
+
+        RoomMember target = roomMemberRepository.findById(targetMembershipId)
+                .orElseThrow(() -> new IllegalArgumentException("Target user is not a member of this room."));
+
+        // Moderator cannot kick the owner
+        if (target.getRole() == com.chat.app.model.RoomRole.OWNER) {
+            throw new org.springframework.security.access.AccessDeniedException("Moderators cannot kick the room owner.");
+        }
+
+        // Owner cannot kick themselves
+        if (targetUserId.equals(requesterId)) {
+            throw new IllegalArgumentException("Room owners cannot kick themselves.");
+        }
+
+        roomMemberRepository.delete(target);
     }
 }

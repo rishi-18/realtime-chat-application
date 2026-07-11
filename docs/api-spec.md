@@ -102,6 +102,44 @@ Registers a user as a member of a room. Required before subscribing or sending m
     - `404 Not Found`: `ROOM_NOT_FOUND` (Target room does not exist).
     - `400 Bad Request`: `ALREADY_MEMBER` (User is already a member of this room).
 
+### Update Room Member Role
+Updates a room member's role (e.g. promotes a member to Moderator). Only room owners can execute this.
+*   **Route**: `PUT /rooms/{roomId}/members/{userId}/role`
+*   **Authentication**: Required (Valid Access Token)
+*   **Request Payload**:
+    ```json
+    {
+      "role": "MODERATOR"
+    }
+    ```
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "roomId": "e0aebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "userId": "d2b2b4bc-a1cd-44b5-9624-383a440ab8d2",
+      "role": "MODERATOR"
+    }
+    ```
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not the room owner).
+    - `404 Not Found`: `ROOM_MEMBER_NOT_FOUND` (Target member does not exist in this room).
+    - `400 Bad Request`: `INVALID_ROLE` (Unsupported or malformed role).
+
+### Kick Room Member
+Kicks a member out of a room. Only room owners or moderators can execute this. Moderators cannot kick room owners.
+*   **Route**: `DELETE /rooms/{roomId}/members/{userId}`
+*   **Authentication**: Required (Valid Access Token)
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "success": true,
+      "message": "User kicked successfully."
+    }
+    ```
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (Insufficient role permissions, or moderator trying to kick the owner).
+    - `404 Not Found`: `ROOM_MEMBER_NOT_FOUND` (Target member does not exist in this room).
+
 ### Upload Media Attachment
 Uploads a file or image to be attached to a message.
 *   **Route**: `POST /media/upload`

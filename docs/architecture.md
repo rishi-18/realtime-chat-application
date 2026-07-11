@@ -125,3 +125,10 @@ graph TD
 - Pin state changes are persisted in the `pinned_messages` table, housing pin metadata (who pinned it and when).
 - The server issues a STOMP broadcast to `/topic/room.{roomId}` syncing the pin state change across all room members' screens.
 - Room members can query all active pinned messages in a room via `GET /api/v1/rooms/{roomId}/pins` (fetching only from the `pinned_messages` join table for sub-millisecond retrieval).
+
+### 13. Channel Roles & Moderation (REST Operations)
+- Room membership is enriched with hierarchical roles: `OWNER`, `MODERATOR`, and `MEMBER`.
+- On room creation, the creator is designated as the `OWNER`. Joining users are initialized as `MEMBER`s.
+- `OWNER`s can promote other members to `MODERATOR`s or demote them via the role-change REST endpoint: `PUT /api/v1/rooms/{roomId}/members/{userId}/role`.
+- `OWNER`s and `MODERATOR`s can kick channel participants via `DELETE /api/v1/rooms/{roomId}/members/{userId}` (moderators cannot demote/kick the owner).
+- Moderation privileges are checked when deleting messages: standard `MEMBER`s can only delete *their own* messages, whereas `OWNER`s and `MODERATOR`s can delete *any* message in the channel.
