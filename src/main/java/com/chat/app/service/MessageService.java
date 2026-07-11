@@ -67,10 +67,21 @@ public class MessageService {
             throw new AccessDeniedException("Cannot send message. You are not a member of this room.");
         }
 
+        Message parentMessage = null;
+        if (request.getParentMessageId() != null) {
+            parentMessage = messageRepository.findById(request.getParentMessageId())
+                    .orElseThrow(() -> new IllegalArgumentException("Parent message not found with id: " + request.getParentMessageId()));
+            
+            if (!parentMessage.getRoom().getId().equals(room.getId())) {
+                throw new IllegalArgumentException("Parent message must belong to the same chat room.");
+            }
+        }
+
         Message message = Message.builder()
                 .room(room)
                 .sender(sender)
                 .content(request.getContent())
+                .parentMessage(parentMessage)
                 .build();
 
         if (request.getAttachments() != null && !request.getAttachments().isEmpty()) {
@@ -182,6 +193,7 @@ public class MessageService {
                 .reactions(reactionResponses)
                 .mentionedUsernames(mentionedUsernames)
                 .isPinned(isPinned)
+                .parentMessageId(message.getParentMessage() != null ? message.getParentMessage().getId() : null)
                 .isDeleted(message.isDeleted())
                 .timestamp(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
@@ -509,6 +521,62 @@ public class MessageService {
                         finalReactionsMap.getOrDefault(pin.getMessage().getId(), java.util.Collections.emptyList()),
                         finalMentionsMap.getOrDefault(pin.getMessage().getId(), java.util.Collections.emptyList()),
                         true
+                ))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<com.chat.app.dto.MessageResponse> getThreadReplies(UUID parentMessageId, UUID userId) {
+        Message parent = messageRepository.findById(parentMessageId)
+                .orElseThrow(() -> new IllegalArgumentException("Parent message not found with id: " + parentMessageId));
+
+        UUID roomId = parent.getRoom().getId();
+        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
+            throw new AccessDeniedException("Cannot fetch thread. You are not a member of this room.");
+        }
+
+        java.util.List<Message> replies = messageRepository.findByParentMessageIdOrderByCreatedAtAsc(parentMessageId);
+        if (replies == null || replies.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        java.util.List<UUID> replyIds = replies.stream()
+                .map(Message::getId)
+                .collect(java.util.stream.Collectors.toList());
+
+        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
+        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> mentionsMap = new java.util.HashMap<>();
+        java.util.Set<UUID> pinnedMessageIds = new java.util.HashSet<>();
+
+        java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(replyIds);
+        if (reactions != null) {
+            reactionsMap = reactions.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
+        }
+
+        java.util.List<com.chat.app.model.MessageMention> mentions = messageMentionRepository.findByMessageIdIn(replyIds);
+        if (mentions != null) {
+            mentionsMap = mentions.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(m -> m.getMessage().getId()));
+        }
+
+        java.util.List<com.chat.app.model.PinnedMessage> pins = pinnedMessageRepository.findByMessageIdIn(replyIds);
+        if (pins != null) {
+            pinnedMessageIds = pins.stream()
+                    .map(p -> p.getMessage().getId())
+                    .collect(java.util.stream.Collectors.toSet());
+        }
+
+        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
+        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
+        final java.util.Set<UUID> finalPinnedMessageIds = pinnedMessageIds;
+
+        return replies.stream()
+                .map(reply -> mapToResponse(
+                        reply,
+                        finalReactionsMap.getOrDefault(reply.getId(), java.util.Collections.emptyList()),
+                        finalMentionsMap.getOrDefault(reply.getId(), java.util.Collections.emptyList()),
+                        finalPinnedMessageIds.contains(reply.getId())
                 ))
                 .collect(java.util.stream.Collectors.toList());
     }

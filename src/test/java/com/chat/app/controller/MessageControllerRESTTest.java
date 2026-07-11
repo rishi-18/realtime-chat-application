@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -126,5 +127,25 @@ class MessageControllerRESTTest {
                 .andExpect(jsonPath("$.message").value("Message deleted successfully."));
 
         verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/room." + room.getId()), any(MessageResponse.class));
+    }
+
+    @Test
+    void getThreadReplies_Success() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        MessageResponse replyResponse = MessageResponse.builder()
+                .id(UUID.randomUUID())
+                .roomId(UUID.randomUUID())
+                .content("reply content")
+                .parentMessageId(messageId)
+                .build();
+
+        when(messageService.getThreadReplies(eq(messageId), any(UUID.class)))
+                .thenReturn(Collections.singletonList(replyResponse));
+
+        mockMvc.perform(get("/api/v1/messages/" + messageId + "/thread")
+                        .principal(new UsernamePasswordAuthenticationToken(userPrincipal, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].content").value("reply content"))
+                .andExpect(jsonPath("$[0].parentMessageId").value(messageId.toString()));
     }
 }

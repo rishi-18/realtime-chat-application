@@ -23,6 +23,7 @@ public class MessageResponse {
     private java.util.List<ReactionResponse> reactions;
     private java.util.List<String> mentionedUsernames;
     private boolean isPinned;
+    private UUID parentMessageId;
     private boolean isDeleted;
     private Instant timestamp;
     private Instant updatedAt;

@@ -33,6 +33,14 @@ public class Message {
     @JoinColumn(name = "sender_id")
     private User sender;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_message_id")
+    private Message parentMessage;
+
+    @OneToMany(mappedBy = "parentMessage", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private java.util.List<Message> replies = new java.util.ArrayList<>();
+
     @Column(columnDefinition = "TEXT")
     private String content;
 

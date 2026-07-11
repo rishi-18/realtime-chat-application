@@ -53,6 +53,8 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `id`: UUID Primary Key, auto-generated.
   - `room`: Lazy `Room` reference (Cascade deletion when room is deleted).
   - `sender`: Lazy `User` reference (Mapped with `ON DELETE SET NULL` to preserve message logs if user is deleted).
+  - `parentMessage`: Lazy `Message` self-referencing entity reference (nullable, represents the parent thread message).
+  - `replies`: One-to-Many self-referencing relationship representing all reply messages in the thread.
   - `content`: TEXT column, nullable (if attachments are present, or if message has been soft-deleted).
   - `isDeleted`: BOOLEAN column, defaults to false.
   - `attachments`: One-to-Many relationship (`List<MessageAttachment>`), eagerly loaded or fetched as needed, with cascade operations enabled.

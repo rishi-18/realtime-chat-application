@@ -42,5 +42,14 @@ public class DatabaseInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Could not run room member role migrations. Error: {}", e.getMessage());
         }
+
+        log.info("Checking messages parent_message_id column and creating indexing...");
+        try {
+            jdbcTemplate.execute("ALTER TABLE messages ADD COLUMN IF NOT EXISTS parent_message_id UUID REFERENCES messages(id) ON DELETE CASCADE");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_messages_parent ON messages(parent_message_id)");
+            log.info("Messages parent_message_id schema and indexing configured successfully.");
+        } catch (Exception e) {
+            log.warn("Could not run message threading schema migrations. Error: {}", e.getMessage());
+        }
     }
 }

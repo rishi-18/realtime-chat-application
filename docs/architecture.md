@@ -132,3 +132,9 @@ graph TD
 - `OWNER`s can promote other members to `MODERATOR`s or demote them via the role-change REST endpoint: `PUT /api/v1/rooms/{roomId}/members/{userId}/role`.
 - `OWNER`s and `MODERATOR`s can kick channel participants via `DELETE /api/v1/rooms/{roomId}/members/{userId}` (moderators cannot demote/kick the owner).
 - Moderation privileges are checked when deleting messages: standard `MEMBER`s can only delete *their own* messages, whereas `OWNER`s and `MODERATOR`s can delete *any* message in the channel.
+
+### 14. Threaded Messaging & Replies (Parent-Child Message Routing)
+- Messages can contain an optional `parent_message_id` reference, pointing to a parent message in the same room.
+- Sending a message with a parent ID registers it as a reply, initiating a conversational thread.
+- Thread replies are broadcast to the room topic `/topic/room.{roomId}` to ensure normal flow synchronization.
+- Peer clients can fetch all replies under a specific thread tree using the REST endpoint `GET /api/v1/messages/{messageId}/thread` (efficient B-Tree index lookup on the self-referencing column).

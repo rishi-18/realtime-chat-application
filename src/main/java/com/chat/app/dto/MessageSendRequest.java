@@ -23,4 +23,6 @@ public class MessageSendRequest {
     private String content;
 
     private java.util.List<AttachmentRequest> attachments;
+
+    private UUID parentMessageId;
 }

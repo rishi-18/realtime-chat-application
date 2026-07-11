@@ -61,4 +61,15 @@ public class MessageControllerREST {
 
         return ResponseEntity.ok(new ApiResponse(true, "Message deleted successfully."));
     }
+
+    @GetMapping("/{messageId}/thread")
+    public ResponseEntity<java.util.List<MessageResponse>> getThreadReplies(
+            @PathVariable UUID messageId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        log.info("Request received to fetch thread replies for message: {} by user: {}", messageId, userPrincipal.getUsername());
+        
+        java.util.List<MessageResponse> responses = messageService.getThreadReplies(messageId, userPrincipal.getId());
+        return ResponseEntity.ok(responses);
+    }
 }

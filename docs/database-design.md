@@ -43,6 +43,7 @@ erDiagram
         uuid id PK
         uuid room_id FK
         uuid sender_id FK
+        uuid parent_message_id FK
         text content
         boolean is_deleted
         timestamp created_at
@@ -123,6 +124,7 @@ erDiagram
 - **Foreign Keys**:
   - `room_id` references `rooms(id)` with `ON DELETE CASCADE`.
   - `sender_id` references `users(id)` with `ON DELETE SET NULL` (preserves historical messages when a user account is deleted).
+  - `parent_message_id` references `messages(id)` with `ON DELETE CASCADE` (removes thread replies if the parent message is deleted or soft-deleted).
 - **Columns**:
   - `content` (TEXT, NULLABLE)
   - `is_deleted` (BOOLEAN, NOT NULL, DEFAULT FALSE)
@@ -131,6 +133,7 @@ erDiagram
 - **Indexes**:
   - **Composite Index**: `idx_messages_room_created` on columns `(room_id, created_at DESC)`. This is optimized for paginated message retrieval (ordering by newest first within a room), eliminating the need for database sorting on large datasets.
   - **Full-Text GIN Index**: `idx_messages_content_fts` on column `to_tsvector('english', content)`. Optimized for keyword searches, bypassing expensive table scans.
+  - **B-Tree Index**: `idx_messages_parent` on column `parent_message_id` (B-Tree). Optimized for fast thread replies retrieval.
 
 ### Table: `message_attachments`
 - **Primary Key**: `id` (UUIDv4)

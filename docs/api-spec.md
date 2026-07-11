@@ -213,6 +213,30 @@ Toggles (adds or removes) an emoji reaction on a message. The user must be a mem
     - `404 Not Found`: `MESSAGE_NOT_FOUND` (Message does not exist).
     - `400 Bad Request`: `BAD_REQUEST` (Invalid emoji character payload).
 
+### Fetch Thread Replies
+Retrieves all reply messages belonging to a parent thread message. The user must be a member of the room where the parent message resides.
+*   **Route**: `GET /messages/{messageId}/thread`
+*   **Authentication**: Required (Valid Access Token)
+*   **Success Response (`200 OK`)**:
+    ```json
+    [
+      {
+        "id": "cb161474-9c0b-4ef8-bb6d-6bb9bd380a22",
+        "roomId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        "senderId": "d2b2b4bc-a1cd-44b5-9624-383a440ab8d2",
+        "senderUsername": "replyUser",
+        "content": "This is a reply to the message.",
+        "parentMessageId": "76161474-9c0b-4ef8-bb6d-6bb9bd380a11",
+        "isPinned": false,
+        "isDeleted": false,
+        "timestamp": "2026-07-11T12:00:00Z"
+      }
+    ]
+    ```
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not a member of the room).
+    - `404 Not Found`: `MESSAGE_NOT_FOUND` (Parent message does not exist).
+
 ### Fetch Message History (Paginated)
 Retrieves historical messages for a room, ordered by creation date descending.
 *   **Route**: `GET /rooms/{roomId}/messages`

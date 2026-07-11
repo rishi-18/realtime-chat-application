@@ -1,5 +1,6 @@
 package com.chat.app.service;
 
+import com.chat.app.dto.MessageResponse;
 import com.chat.app.dto.MessageSendRequest;
 import com.chat.app.exception.RoomNotFoundException;
 import com.chat.app.model.Message;
@@ -644,5 +645,101 @@ class MessageServiceTest {
         assertNotNull(result);
         assertTrue(result.isDeleted());
         verify(pinnedMessageRepository, times(1)).delete(pin);
+    }
+
+    @Test
+    void saveMessage_ThreadReply_Success() {
+        // Arrange
+        UUID parentId = UUID.randomUUID();
+        Message parentMessage = Message.builder()
+                .id(parentId)
+                .room(room)
+                .sender(sender)
+                .content("parent content")
+                .build();
+
+        MessageSendRequest request = MessageSendRequest.builder()
+                .roomId(room.getId())
+                .content("reply content")
+                .parentMessageId(parentId)
+                .build();
+
+        when(roomRepository.findById(room.getId())).thenReturn(Optional.of(room));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+        when(messageRepository.findById(parentId)).thenReturn(Optional.of(parentMessage));
+        when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        Message reply = messageService.saveMessage(request, sender.getId());
+
+        // Assert
+        assertNotNull(reply);
+        assertEquals("reply content", reply.getContent());
+        assertNotNull(reply.getParentMessage());
+        assertEquals(parentId, reply.getParentMessage().getId());
+    }
+
+    @Test
+    void saveMessage_ThreadReply_FailsWithDifferentRoom() {
+        // Arrange
+        UUID parentId = UUID.randomUUID();
+        Room otherRoom = Room.builder().id(UUID.randomUUID()).name("other").build();
+        Message parentMessage = Message.builder()
+                .id(parentId)
+                .room(otherRoom)
+                .sender(sender)
+                .content("parent in other room")
+                .build();
+
+        MessageSendRequest request = MessageSendRequest.builder()
+                .roomId(room.getId())
+                .content("reply content")
+                .parentMessageId(parentId)
+                .build();
+
+        when(roomRepository.findById(room.getId())).thenReturn(Optional.of(room));
+        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+        when(messageRepository.findById(parentId)).thenReturn(Optional.of(parentMessage));
+
+        // Act & Assert
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            messageService.saveMessage(request, sender.getId());
+        });
+        assertEquals("Parent message must belong to the same chat room.", exception.getMessage());
+    }
+
+    @Test
+    void getThreadReplies_Success() {
+        // Arrange
+        UUID parentId = UUID.randomUUID();
+        Message parent = Message.builder()
+                .id(parentId)
+                .room(room)
+                .content("parent message")
+                .build();
+
+        Message reply = Message.builder()
+                .id(UUID.randomUUID())
+                .room(room)
+                .sender(sender)
+                .content("reply message")
+                .parentMessage(parent)
+                .build();
+
+        when(messageRepository.findById(parentId)).thenReturn(Optional.of(parent));
+        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
+        when(messageRepository.findByParentMessageIdOrderByCreatedAtAsc(parentId))
+                .thenReturn(java.util.Arrays.asList(reply));
+
+        // Act
+        java.util.List<MessageResponse> result = messageService.getThreadReplies(parentId, sender.getId());
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("reply message", result.get(0).getContent());
+        assertEquals(parentId, result.get(0).getParentMessageId());
     }
 }

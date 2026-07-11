@@ -308,3 +308,25 @@ We chose **Option B (Join Audit Table)**. While Option A is slightly simpler, it
 
 ### Final Decision & Rationale
 We chose **Option B (Static Hierarchical Roles)**. For an instant messaging application, the roles of Owner, Moderator, and Member are standard and stable. Implementing a dynamic ACL system introduces unnecessary database query joins, indexing overhead, and complex maintenance logic. Defining a simple Java Enum with hierarchical checks (e.g. `role.canModerate()`) is extremely performant, easy to maintain, and meets all moderation security specifications with minimal engineering footprint.
+
+---
+
+## Decision 17: Thread Event Routing & Broadcasting Strategy
+
+- **Context**: Deciding how to route thread reply messages via WebSockets.
+- **Date**: 2026-07-11
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Broadcast all replies to the main room topic `/topic/room.{roomId}` [Chosen]**.
+  - **Option B: Restrict reply broadcasts to thread-specific subscription endpoints `/topic/thread.{parentMessageId}` [Rejected]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Broadcast to Room) [Chosen] | Option B (Broadcast to Thread) |
+| :--- | :--- | :--- |
+| **WebSocket Connection Density** | **High efficiency** (No additional socket subscription changes) | Low efficiency (Requires subscribing to many thread topics) |
+| **Notification Sync Integration** | **Simple** (Reuses standard client mention/unread logic) | Complex (Requires thread listener monitoring filters) |
+| **Traffic Overhead on Clients** | High (All users receive replies to threads they aren't reading) | **Low** (Users only receive thread updates they subscribed to) |
+
+### Final Decision & Rationale
+We chose **Option A (Broadcast to Room)**. While Option B reduces traffic on peer clients, it requires clients to constantly subscribe and unsubscribe to active message threads. This increases WebSocket handshake and subscribe frame density on high-concurrency clusters. Option A allows clients to reuse their existing channel subscriptions. Standard room filtering logic on the client can hide or organize thread replies in the UI, keeping connection states clean.

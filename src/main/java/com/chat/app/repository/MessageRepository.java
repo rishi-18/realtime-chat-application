@@ -26,4 +26,6 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             @org.springframework.data.repository.query.Param("query") String query,
             Pageable pageable
     );
+
+    java.util.List<Message> findByParentMessageIdOrderByCreatedAtAsc(UUID parentMessageId);
 }

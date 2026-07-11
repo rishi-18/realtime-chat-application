@@ -270,3 +270,34 @@ Standard API validations restrict message deletions to the author (`message.send
 - When a user requests message deletion, the backend fetches their `RoomMember` association.
 - If the member holds the `OWNER` or `MODERATOR` role in that room, the sender validation check is bypassed, allowing moderators to immediately soft-delete spam.
 - Standard members are still strictly bound to deleting only their own messages.
+
+---
+
+## 16. Threaded Conversations & Self-Referential Relational Models
+
+Threaded messaging maps parent-child structures within the same database entity table. Designing replies involves managing recursive references, indexing parent IDs, and handling cascade deletions.
+
+### 1. Database Mapping & Foreign Key
+A message becomes a reply by linking its `parent_message_id` to `messages(id)`. This self-referencing column uses:
+- A B-Tree index `idx_messages_parent` to quickly locate all replies for a given message ID ($O(\log N)$).
+- A database-level `ON DELETE CASCADE` constraint. If a parent message is permanently deleted, all of its replies are deleted from the database in a single operation, maintaining relational integrity.
+
+### 2. JPA Self-Referencing Annotations
+In Hibernate/JPA:
+- The parent message is mapped as:
+  ```java
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "parent_message_id")
+  private Message parentMessage;
+  ```
+- The child replies are mapped as:
+  ```java
+  @OneToMany(mappedBy = "parentMessage", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<Message> replies = new ArrayList<>();
+  ```
+This structure ensures that Hibernate handles dirty-checking and state updates correctly, without requiring separate database operations.
+
+### 3. Thread Scope & Room Bounds Validation
+To prevent cross-room threading vulnerabilities (e.g., posting a reply in Room A that links to a parent message in Room B):
+- When a user replies to a message, the backend validates that both the parent message and the reply belong to the exact same `room_id`.
+- If the parent message is soft-deleted, replies are still allowed (enabling users to see thread history even if the parent content is removed). If the parent message is permanently deleted, the database deletes the child replies automatically.
