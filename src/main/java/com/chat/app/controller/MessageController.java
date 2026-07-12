@@ -5,6 +5,7 @@ import com.chat.app.dto.MessageSendRequest;
 import com.chat.app.model.Message;
 import com.chat.app.security.UserPrincipal;
 import com.chat.app.service.MessageService;
+import com.chat.app.mapper.MessageMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.security.Principal;
 public class MessageController {
 
     private final MessageService messageService;
+    private final MessageMapper messageMapper;
     private final SimpMessagingTemplate messagingTemplate;
     private final com.chat.app.service.RoomService roomService;
     private final com.chat.app.config.RedisPublisher redisPublisher;
@@ -40,7 +42,7 @@ public class MessageController {
         Message message = messageService.saveMessage(request, userPrincipal.getId());
 
         // Assemble broadcast payload
-        MessageResponse response = messageService.mapToResponse(message);
+        MessageResponse response = messageMapper.mapToResponse(message);
 
         // Publish to shared Redis Pub/Sub channel
         redisPublisher.publish(response);

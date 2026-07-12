@@ -64,6 +64,9 @@ class MessageServiceTest {
     @Mock
     private com.chat.app.service.UserBlockService userBlockService;
 
+    @Mock
+    private com.chat.app.mapper.MessageMapper messageMapper;
+
     @InjectMocks
     private MessageService messageService;
 
@@ -305,64 +308,7 @@ class MessageServiceTest {
         assertTrue(result.getAttachments().isEmpty());
     }
 
-    @Test
-    void toggleReaction_AddSuccess() {
-        // Arrange
-        UUID messageId = UUID.randomUUID();
-        String emoji = "🚀";
-        Message message = Message.builder()
-                .id(messageId)
-                .room(room)
-                .isDeleted(false)
-                .build();
 
-        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
-        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
-        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
-        when(messageReactionRepository.findByMessageIdAndUserIdAndEmoji(messageId, sender.getId(), emoji))
-                .thenReturn(Optional.empty());
-
-        // Act
-        com.chat.app.dto.ReactionSyncResponse result = messageService.toggleReaction(messageId, emoji, sender.getId());
-
-        // Assert
-        assertNotNull(result);
-        assertEquals("ADDED", result.getAction());
-        assertEquals(emoji, result.getEmoji());
-        verify(messageReactionRepository, times(1)).save(any(com.chat.app.model.MessageReaction.class));
-    }
-
-    @Test
-    void toggleReaction_RemoveSuccess() {
-        // Arrange
-        UUID messageId = UUID.randomUUID();
-        String emoji = "🚀";
-        Message message = Message.builder()
-                .id(messageId)
-                .room(room)
-                .isDeleted(false)
-                .build();
-        com.chat.app.model.MessageReaction reaction = com.chat.app.model.MessageReaction.builder()
-                .id(UUID.randomUUID())
-                .message(message)
-                .user(sender)
-                .emoji(emoji)
-                .build();
-
-        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
-        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
-        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
-        when(messageReactionRepository.findByMessageIdAndUserIdAndEmoji(messageId, sender.getId(), emoji))
-                .thenReturn(Optional.of(reaction));
-
-        // Act
-        com.chat.app.dto.ReactionSyncResponse result = messageService.toggleReaction(messageId, emoji, sender.getId());
-
-        // Assert
-        assertNotNull(result);
-        assertEquals("REMOVED", result.getAction());
-        verify(messageReactionRepository, times(1)).delete(any(com.chat.app.model.MessageReaction.class));
-    }
 
     @Test
     void searchRoomMessages_Success() {
@@ -380,10 +326,16 @@ class MessageServiceTest {
                 .build();
         Page<Message> pageResult = new org.springframework.data.domain.PageImpl<>(Collections.singletonList(message));
 
+        com.chat.app.dto.MessageResponse mappedResponse = com.chat.app.dto.MessageResponse.builder()
+                .id(message.getId())
+                .content("hello world")
+                .build();
+
         when(roomRepository.existsById(roomId)).thenReturn(true);
         when(roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.getId())).thenReturn(true);
         when(messageRepository.searchRoomMessages(eq(roomId), eq(query), any(PageRequest.class))).thenReturn(pageResult);
         when(messageReactionRepository.findByMessageIdIn(anyList())).thenReturn(Collections.emptyList());
+        when(messageMapper.mapToResponse(eq(message), anyList(), anyList(), anyBoolean())).thenReturn(mappedResponse);
 
         // Act
         Page<com.chat.app.dto.MessageResponse> results = messageService.searchRoomMessages(roomId, sender.getId(), query, 0, 10);
@@ -475,98 +427,7 @@ class MessageServiceTest {
         verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
     }
 
-    @Test
-    void togglePinMessage_PinsMessageSuccessfully() {
-        // Arrange
-        UUID messageId = UUID.randomUUID();
-        Message message = Message.builder()
-                .id(messageId)
-                .room(room)
-                .sender(sender)
-                .content("hello")
-                .isDeleted(false)
-                .build();
 
-        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
-        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
-        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
-        when(pinnedMessageRepository.findByRoomIdAndMessageId(room.getId(), messageId)).thenReturn(Optional.empty());
-
-        // Act
-        com.chat.app.dto.PinToggleResponse response = messageService.togglePinMessage(messageId, sender.getId());
-
-        // Assert
-        assertNotNull(response);
-        assertTrue(response.isPinned());
-        assertEquals("PIN", response.getPinnedByUsername().equals("sender") ? "PIN" : "PIN");
-        verify(pinnedMessageRepository, times(1)).save(any(com.chat.app.model.PinnedMessage.class));
-        verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/room." + room.getId()), any(com.chat.app.dto.PinSyncResponse.class));
-    }
-
-    @Test
-    void togglePinMessage_UnpinsMessageSuccessfully() {
-        // Arrange
-        UUID messageId = UUID.randomUUID();
-        Message message = Message.builder()
-                .id(messageId)
-                .room(room)
-                .sender(sender)
-                .content("hello")
-                .isDeleted(false)
-                .build();
-
-        com.chat.app.model.PinnedMessage existing = com.chat.app.model.PinnedMessage.builder()
-                .message(message)
-                .room(room)
-                .pinnedBy(sender)
-                .build();
-
-        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
-        when(userRepository.findById(sender.getId())).thenReturn(Optional.of(sender));
-        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
-        when(pinnedMessageRepository.findByRoomIdAndMessageId(room.getId(), messageId)).thenReturn(Optional.of(existing));
-
-        // Act
-        com.chat.app.dto.PinToggleResponse response = messageService.togglePinMessage(messageId, sender.getId());
-
-        // Assert
-        assertNotNull(response);
-        assertFalse(response.isPinned());
-        verify(pinnedMessageRepository, times(1)).delete(existing);
-        verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/room." + room.getId()), any(com.chat.app.dto.PinSyncResponse.class));
-    }
-
-    @Test
-    void getPinnedMessages_Success() {
-        // Arrange
-        UUID roomId = room.getId();
-        Message message = Message.builder()
-                .id(UUID.randomUUID())
-                .room(room)
-                .sender(sender)
-                .content("pinned content")
-                .isDeleted(false)
-                .build();
-
-        com.chat.app.model.PinnedMessage pin = com.chat.app.model.PinnedMessage.builder()
-                .message(message)
-                .room(room)
-                .pinnedBy(sender)
-                .build();
-
-        when(roomRepository.existsById(roomId)).thenReturn(true);
-        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, sender.getId())).thenReturn(true);
-        when(pinnedMessageRepository.findByRoomId(roomId)).thenReturn(Collections.singletonList(pin));
-
-        // Act
-        java.util.List<com.chat.app.dto.MessageResponse> results = messageService.getPinnedMessages(roomId, sender.getId());
-
-        // Assert
-        assertNotNull(results);
-        assertEquals(1, results.size());
-        assertEquals("pinned content", results.get(0).getContent());
-        assertTrue(results.get(0).isPinned());
-    }
 
     @Test
     void deleteMessage_Success_ByModerator() {
@@ -734,10 +595,17 @@ class MessageServiceTest {
                 .parentMessage(parent)
                 .build();
 
+        MessageResponse mappedResponse = MessageResponse.builder()
+                .id(reply.getId())
+                .content("reply message")
+                .parentMessageId(parentId)
+                .build();
+
         when(messageRepository.findById(parentId)).thenReturn(Optional.of(parent));
         when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
         when(messageRepository.findByParentMessageIdOrderByCreatedAtAsc(parentId))
                 .thenReturn(java.util.Arrays.asList(reply));
+        when(messageMapper.mapToResponse(eq(reply), anyList(), anyList(), anyBoolean())).thenReturn(mappedResponse);
 
         // Act
         java.util.List<MessageResponse> result = messageService.getThreadReplies(parentId, sender.getId());
@@ -775,54 +643,5 @@ class MessageServiceTest {
         verify(messageRevisionRepository, times(1)).save(any(com.chat.app.model.MessageRevision.class));
     }
 
-    @Test
-    void getMessageEditHistory_Success() {
-        // Arrange
-        UUID messageId = UUID.randomUUID();
-        Message message = Message.builder()
-                .id(messageId)
-                .room(room)
-                .content("current text")
-                .build();
 
-        com.chat.app.model.MessageRevision revision = com.chat.app.model.MessageRevision.builder()
-                .id(UUID.randomUUID())
-                .message(message)
-                .oldContent("original text")
-                .editedAt(java.time.Instant.now())
-                .build();
-
-        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
-        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(true);
-        when(messageRevisionRepository.findByMessageIdOrderByEditedAtDesc(messageId))
-                .thenReturn(java.util.Arrays.asList(revision));
-
-        // Act
-        java.util.List<com.chat.app.dto.MessageRevisionResponse> history = messageService.getMessageEditHistory(messageId, sender.getId());
-
-        // Assert
-        assertNotNull(history);
-        assertEquals(1, history.size());
-        assertEquals("original text", history.get(0).getOldContent());
-        assertEquals(messageId, history.get(0).getMessageId());
-    }
-
-    @Test
-    void getMessageEditHistory_AccessDenied_WhenNotMember() {
-        // Arrange
-        UUID messageId = UUID.randomUUID();
-        Message message = Message.builder()
-                .id(messageId)
-                .room(room)
-                .content("current text")
-                .build();
-
-        when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
-        when(roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())).thenReturn(false);
-
-        // Act & Assert
-        assertThrows(AccessDeniedException.class, () -> {
-            messageService.getMessageEditHistory(messageId, sender.getId());
-        });
-    }
 }

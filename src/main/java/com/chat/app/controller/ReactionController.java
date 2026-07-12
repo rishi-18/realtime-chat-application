@@ -3,7 +3,7 @@ package com.chat.app.controller;
 import com.chat.app.dto.ReactionRequest;
 import com.chat.app.dto.ReactionSyncResponse;
 import com.chat.app.security.UserPrincipal;
-import com.chat.app.service.MessageService;
+import com.chat.app.service.MessageReactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,7 @@ import java.util.UUID;
 @Slf4j
 public class ReactionController {
 
-    private final MessageService messageService;
+    private final MessageReactionService messageReactionService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping("/{messageId}/reactions")
@@ -32,7 +32,7 @@ public class ReactionController {
         log.info("Request to toggle reaction {} on message {} by user {}", 
                 request.getEmoji(), messageId, userPrincipal.getUsername());
 
-        ReactionSyncResponse response = messageService.toggleReaction(messageId, request.getEmoji(), userPrincipal.getId());
+        ReactionSyncResponse response = messageReactionService.toggleReaction(messageId, request.getEmoji(), userPrincipal.getId());
 
         // Broadcast reaction toggle sync to websocket subscribers
         String destination = "/topic/room." + response.getRoomId();

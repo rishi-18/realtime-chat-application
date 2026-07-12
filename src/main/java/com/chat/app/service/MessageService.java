@@ -32,6 +32,7 @@ public class MessageService {
     private final com.chat.app.repository.MessageRevisionRepository messageRevisionRepository;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
     private final com.chat.app.service.UserBlockService userBlockService;
+    private final com.chat.app.mapper.MessageMapper messageMapper;
 
     public MessageService(
             MessageRepository messageRepository,
@@ -43,7 +44,8 @@ public class MessageService {
             com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository,
             com.chat.app.repository.MessageRevisionRepository messageRevisionRepository,
             @org.springframework.context.annotation.Lazy org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate,
-            com.chat.app.service.UserBlockService userBlockService) {
+            com.chat.app.service.UserBlockService userBlockService,
+            com.chat.app.mapper.MessageMapper messageMapper) {
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
         this.roomMemberRepository = roomMemberRepository;
@@ -54,6 +56,7 @@ public class MessageService {
         this.messageRevisionRepository = messageRevisionRepository;
         this.messagingTemplate = messagingTemplate;
         this.userBlockService = userBlockService;
+        this.messageMapper = messageMapper;
     }
 
     @Transactional
@@ -159,68 +162,7 @@ public class MessageService {
         return savedMessage;
     }
 
-    public com.chat.app.dto.MessageResponse mapToResponse(Message message) {
-        boolean isPinned = pinnedMessageRepository.findByRoomIdAndMessageId(message.getRoom().getId(), message.getId()).isPresent();
-        return mapToResponse(message, java.util.Collections.emptyList(), java.util.Collections.emptyList(), isPinned);
-    }
 
-    public com.chat.app.dto.MessageResponse mapToResponse(Message message, java.util.List<com.chat.app.model.MessageReaction> reactions) {
-        boolean isPinned = pinnedMessageRepository.findByRoomIdAndMessageId(message.getRoom().getId(), message.getId()).isPresent();
-        return mapToResponse(message, reactions, java.util.Collections.emptyList(), isPinned);
-    }
-
-    public com.chat.app.dto.MessageResponse mapToResponse(
-            Message message, 
-            java.util.List<com.chat.app.model.MessageReaction> reactions,
-            java.util.List<com.chat.app.model.MessageMention> mentions,
-            boolean isPinned) {
-        java.util.List<com.chat.app.dto.AttachmentResponse> attachments = null;
-        if (message.getAttachments() != null) {
-            attachments = message.getAttachments().stream()
-                    .map(att -> com.chat.app.dto.AttachmentResponse.builder()
-                            .id(att.getId())
-                            .fileName(att.getFileName())
-                            .fileUrl(att.getFileUrl())
-                            .fileType(att.getFileType())
-                            .fileSize(att.getFileSize())
-                            .build())
-                    .collect(java.util.stream.Collectors.toList());
-        }
-
-        java.util.List<com.chat.app.dto.ReactionResponse> reactionResponses = null;
-        if (reactions != null && !reactions.isEmpty()) {
-            reactionResponses = reactions.stream()
-                    .map(r -> com.chat.app.dto.ReactionResponse.builder()
-                            .userId(r.getUser().getId())
-                            .username(r.getUser().getUsername())
-                            .emoji(r.getEmoji())
-                            .build())
-                    .collect(java.util.stream.Collectors.toList());
-        }
-
-        java.util.List<String> mentionedUsernames = null;
-        if (mentions != null && !mentions.isEmpty()) {
-            mentionedUsernames = mentions.stream()
-                    .map(m -> m.getUser().getUsername())
-                    .collect(java.util.stream.Collectors.toList());
-        }
-
-        return com.chat.app.dto.MessageResponse.builder()
-                .id(message.getId())
-                .roomId(message.getRoom().getId())
-                .senderId(message.getSender() != null ? message.getSender().getId() : null)
-                .senderUsername(message.getSender() != null ? message.getSender().getUsername() : "Deleted User")
-                .content(message.getContent())
-                .attachments(attachments)
-                .reactions(reactionResponses)
-                .mentionedUsernames(mentionedUsernames)
-                .isPinned(isPinned)
-                .parentMessageId(message.getParentMessage() != null ? message.getParentMessage().getId() : null)
-                .isDeleted(message.isDeleted())
-                .timestamp(message.getCreatedAt())
-                .updatedAt(message.getUpdatedAt())
-                .build();
-    }
 
     @Transactional(readOnly = true)
     public Page<com.chat.app.dto.MessageResponse> getMessageHistoryResponses(UUID roomId, UUID userId, int page, int size) {
@@ -258,7 +200,7 @@ public class MessageService {
         final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
         final java.util.Set<UUID> finalPinnedMessageIds = pinnedMessageIds;
 
-        return messages.map(message -> mapToResponse(
+        return messages.map(message -> messageMapper.mapToResponse(
                 message, 
                 finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
                 finalMentionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
@@ -360,49 +302,7 @@ public class MessageService {
         return messageRepository.save(message);
     }
 
-    @Transactional
-    public com.chat.app.dto.ReactionSyncResponse toggleReaction(UUID messageId, String emoji, UUID userId) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new IllegalArgumentException("Message not found with id: " + messageId));
 
-        if (message.isDeleted()) {
-            throw new IllegalArgumentException("Cannot react to a soft-deleted message.");
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
-
-        // Enforce membership constraint
-        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(message.getRoom().getId(), userId)) {
-            throw new org.springframework.security.access.AccessDeniedException("Cannot react to message. You are not a member of this room.");
-        }
-
-        java.util.Optional<com.chat.app.model.MessageReaction> existing =
-                messageReactionRepository.findByMessageIdAndUserIdAndEmoji(messageId, userId, emoji);
-
-        String action;
-        if (existing.isPresent()) {
-            messageReactionRepository.delete(existing.get());
-            action = "REMOVED";
-        } else {
-            com.chat.app.model.MessageReaction reaction = com.chat.app.model.MessageReaction.builder()
-                    .message(message)
-                    .user(user)
-                    .emoji(emoji)
-                    .build();
-            messageReactionRepository.save(reaction);
-            action = "ADDED";
-        }
-
-        return com.chat.app.dto.ReactionSyncResponse.builder()
-                .messageId(messageId)
-                .roomId(message.getRoom().getId())
-                .emoji(emoji)
-                .action(action)
-                .userId(userId)
-                .username(user.getUsername())
-                .build();
-    }
 
     @Transactional(readOnly = true)
     public Page<com.chat.app.dto.MessageResponse> searchRoomMessages(UUID roomId, UUID userId, String query, int page, int size) {
@@ -449,7 +349,7 @@ public class MessageService {
         final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
         final java.util.Set<UUID> finalPinnedMessageIds = pinnedMessageIds;
 
-        return messages.map(message -> mapToResponse(
+        return messages.map(message -> messageMapper.mapToResponse(
                 message, 
                 finalReactionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
                 finalMentionsMap.getOrDefault(message.getId(), java.util.Collections.emptyList()),
@@ -457,112 +357,7 @@ public class MessageService {
         ));
     }
 
-    @Transactional
-    public com.chat.app.dto.PinToggleResponse togglePinMessage(UUID messageId, UUID userId) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new IllegalArgumentException("Message not found with id: " + messageId));
 
-        if (message.isDeleted()) {
-            throw new IllegalArgumentException("Cannot pin a soft-deleted message.");
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
-
-        UUID roomId = message.getRoom().getId();
-        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
-            throw new AccessDeniedException("Cannot pin message. You are not a member of this room.");
-        }
-
-        java.util.Optional<com.chat.app.model.PinnedMessage> existingPin = 
-                pinnedMessageRepository.findByRoomIdAndMessageId(roomId, messageId);
-
-        boolean pinned;
-        String action;
-        java.time.Instant pinnedAt;
-
-        if (existingPin.isPresent()) {
-            pinnedMessageRepository.delete(existingPin.get());
-            pinned = false;
-            action = "UNPIN";
-            pinnedAt = null;
-        } else {
-            com.chat.app.model.PinnedMessage pin = com.chat.app.model.PinnedMessage.builder()
-                    .message(message)
-                    .room(message.getRoom())
-                    .pinnedBy(user)
-                    .build();
-            pinnedMessageRepository.save(pin);
-            pinned = true;
-            action = "PIN";
-            pinnedAt = java.time.Instant.now();
-        }
-
-        // Broadcast WebSocket sync event
-        com.chat.app.dto.PinSyncResponse syncPayload = com.chat.app.dto.PinSyncResponse.builder()
-                .messageId(messageId)
-                .roomId(roomId)
-                .pinned(pinned)
-                .pinnedByUsername(user.getUsername())
-                .action(action)
-                .build();
-        messagingTemplate.convertAndSend("/topic/room." + roomId, syncPayload);
-
-        return com.chat.app.dto.PinToggleResponse.builder()
-                .messageId(messageId)
-                .roomId(roomId)
-                .pinned(pinned)
-                .pinnedByUsername(user.getUsername())
-                .pinnedAt(pinnedAt)
-                .build();
-    }
-
-    @Transactional(readOnly = true)
-    public java.util.List<com.chat.app.dto.MessageResponse> getPinnedMessages(UUID roomId, UUID userId) {
-        if (!roomRepository.existsById(roomId)) {
-            throw new RoomNotFoundException("Room not found with id: " + roomId);
-        }
-
-        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
-            throw new AccessDeniedException("Cannot fetch pinned messages. You are not a member of this room.");
-        }
-
-        java.util.List<com.chat.app.model.PinnedMessage> pins = pinnedMessageRepository.findByRoomId(roomId);
-        if (pins == null || pins.isEmpty()) {
-            return java.util.Collections.emptyList();
-        }
-
-        java.util.List<UUID> messageIds = pins.stream()
-                .map(p -> p.getMessage().getId())
-                .collect(java.util.stream.Collectors.toList());
-
-        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> reactionsMap = new java.util.HashMap<>();
-        java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> mentionsMap = new java.util.HashMap<>();
-        
-        java.util.List<com.chat.app.model.MessageReaction> reactions = messageReactionRepository.findByMessageIdIn(messageIds);
-        if (reactions != null) {
-            reactionsMap = reactions.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(r -> r.getMessage().getId()));
-        }
-
-        java.util.List<com.chat.app.model.MessageMention> mentions = messageMentionRepository.findByMessageIdIn(messageIds);
-        if (mentions != null) {
-            mentionsMap = mentions.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(m -> m.getMessage().getId()));
-        }
-
-        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageReaction>> finalReactionsMap = reactionsMap;
-        final java.util.Map<UUID, java.util.List<com.chat.app.model.MessageMention>> finalMentionsMap = mentionsMap;
-
-        return pins.stream()
-                .map(pin -> mapToResponse(
-                        pin.getMessage(),
-                        finalReactionsMap.getOrDefault(pin.getMessage().getId(), java.util.Collections.emptyList()),
-                        finalMentionsMap.getOrDefault(pin.getMessage().getId(), java.util.Collections.emptyList()),
-                        true
-                ))
-                .collect(java.util.stream.Collectors.toList());
-    }
 
     @Transactional(readOnly = true)
     public java.util.List<com.chat.app.dto.MessageResponse> getThreadReplies(UUID parentMessageId, UUID userId) {
@@ -611,7 +406,7 @@ public class MessageService {
         final java.util.Set<UUID> finalPinnedMessageIds = pinnedMessageIds;
 
         return replies.stream()
-                .map(reply -> mapToResponse(
+                .map(reply -> messageMapper.mapToResponse(
                         reply,
                         finalReactionsMap.getOrDefault(reply.getId(), java.util.Collections.emptyList()),
                         finalMentionsMap.getOrDefault(reply.getId(), java.util.Collections.emptyList()),
@@ -620,27 +415,5 @@ public class MessageService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
-    public java.util.List<com.chat.app.dto.MessageRevisionResponse> getMessageEditHistory(UUID messageId, UUID userId) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new IllegalArgumentException("Message not found with id: " + messageId));
 
-        if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(message.getRoom().getId(), userId)) {
-            throw new AccessDeniedException("Cannot fetch edit history. You are not a member of this room.");
-        }
-
-        java.util.List<com.chat.app.model.MessageRevision> revisions = messageRevisionRepository.findByMessageIdOrderByEditedAtDesc(messageId);
-        if (revisions == null || revisions.isEmpty()) {
-            return java.util.Collections.emptyList();
-        }
-
-        return revisions.stream()
-                .map(rev -> com.chat.app.dto.MessageRevisionResponse.builder()
-                        .id(rev.getId())
-                        .messageId(messageId)
-                        .oldContent(rev.getOldContent())
-                        .editedAt(rev.getEditedAt())
-                        .build())
-                .collect(java.util.stream.Collectors.toList());
-    }
 }

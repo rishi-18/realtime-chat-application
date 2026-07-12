@@ -41,6 +41,12 @@ class MessageControllerRESTTest {
     private MessageService messageService;
 
     @Mock
+    private com.chat.app.service.MessageRevisionService messageRevisionService;
+
+    @Mock
+    private com.chat.app.mapper.MessageMapper messageMapper;
+
+    @Mock
     private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
@@ -87,7 +93,7 @@ class MessageControllerRESTTest {
 
         when(messageService.editMessage(eq(messageId), any(MessageUpdateRequest.class), any(UUID.class)))
                 .thenReturn(message);
-        when(messageService.mapToResponse(any(Message.class))).thenReturn(response);
+        when(messageMapper.mapToResponse(any(Message.class))).thenReturn(response);
 
         mockMvc.perform(put("/api/v1/messages/" + messageId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,7 +124,7 @@ class MessageControllerRESTTest {
                 .build();
 
         when(messageService.deleteMessage(eq(messageId), any(UUID.class))).thenReturn(message);
-        when(messageService.mapToResponse(any(Message.class))).thenReturn(response);
+        when(messageMapper.mapToResponse(any(Message.class))).thenReturn(response);
 
         mockMvc.perform(delete("/api/v1/messages/" + messageId)
                         .principal(new UsernamePasswordAuthenticationToken(userPrincipal, null)))
@@ -159,7 +165,7 @@ class MessageControllerRESTTest {
                 .editedAt(Instant.now())
                 .build();
 
-        when(messageService.getMessageEditHistory(eq(messageId), any(UUID.class)))
+        when(messageRevisionService.getMessageEditHistory(eq(messageId), any(UUID.class)))
                 .thenReturn(Collections.singletonList(revisionResponse));
 
         mockMvc.perform(get("/api/v1/messages/" + messageId + "/history")

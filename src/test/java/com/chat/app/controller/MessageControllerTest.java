@@ -36,6 +36,9 @@ class MessageControllerTest {
     private MessageService messageService;
 
     @Mock
+    private com.chat.app.mapper.MessageMapper messageMapper;
+
+    @Mock
     private SimpMessagingTemplate messagingTemplate;
 
     @Mock
@@ -88,7 +91,7 @@ class MessageControllerTest {
                 .build();
 
         when(messageService.saveMessage(any(MessageSendRequest.class), eq(userId))).thenReturn(message);
-        when(messageService.mapToResponse(any(Message.class))).thenReturn(mockResponse);
+        when(messageMapper.mapToResponse(any(Message.class))).thenReturn(mockResponse);
 
         // Act
         messageController.sendMessage(request, mockPrincipal);

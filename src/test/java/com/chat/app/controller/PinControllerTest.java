@@ -3,7 +3,7 @@ package com.chat.app.controller;
 import com.chat.app.dto.MessageResponse;
 import com.chat.app.dto.PinToggleResponse;
 import com.chat.app.security.UserPrincipal;
-import com.chat.app.service.MessageService;
+import com.chat.app.service.MessagePinService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +34,7 @@ class PinControllerTest {
     private MockMvc mockMvc;
 
     @Mock
-    private MessageService messageService;
+    private MessagePinService messagePinService;
 
     @InjectMocks
     private PinController pinController;
@@ -62,7 +62,7 @@ class PinControllerTest {
                 .pinnedAt(Instant.now())
                 .build();
 
-        when(messageService.togglePinMessage(eq(messageId), any(UUID.class))).thenReturn(response);
+        when(messagePinService.togglePinMessage(eq(messageId), any(UUID.class))).thenReturn(response);
 
         // Act & Assert
         mockMvc.perform(post("/api/v1/messages/" + messageId + "/pin")
@@ -87,7 +87,7 @@ class PinControllerTest {
                 .timestamp(Instant.now())
                 .build();
 
-        when(messageService.getPinnedMessages(eq(roomId), any(UUID.class)))
+        when(messagePinService.getPinnedMessages(eq(roomId), any(UUID.class)))
                 .thenReturn(Collections.singletonList(msgResponse));
 
         // Act & Assert

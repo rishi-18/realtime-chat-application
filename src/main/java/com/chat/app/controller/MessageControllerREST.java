@@ -6,6 +6,7 @@ import com.chat.app.dto.MessageUpdateRequest;
 import com.chat.app.model.Message;
 import com.chat.app.security.UserPrincipal;
 import com.chat.app.service.MessageService;
+import com.chat.app.service.MessageRevisionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,9 @@ import java.util.UUID;
 public class MessageControllerREST {
 
     private final MessageService messageService;
+    private final MessageRevisionService messageRevisionService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.chat.app.mapper.MessageMapper messageMapper;
 
     @PutMapping("/{messageId}")
     public ResponseEntity<MessageResponse> editMessage(
@@ -34,7 +37,7 @@ public class MessageControllerREST {
         log.info("Request received to edit message: {} by user: {}", messageId, userPrincipal.getUsername());
         
         Message message = messageService.editMessage(messageId, request, userPrincipal.getId());
-        MessageResponse response = messageService.mapToResponse(message);
+        MessageResponse response = messageMapper.mapToResponse(message);
 
         // Broadcast to WebSocket subscribers to sync change in real-time
         String destination = "/topic/room." + message.getRoom().getId();
@@ -52,7 +55,7 @@ public class MessageControllerREST {
         log.info("Request received to delete message: {} by user: {}", messageId, userPrincipal.getUsername());
 
         Message message = messageService.deleteMessage(messageId, userPrincipal.getId());
-        MessageResponse response = messageService.mapToResponse(message);
+        MessageResponse response = messageMapper.mapToResponse(message);
 
         // Broadcast to WebSocket subscribers to sync soft-delete in real-time
         String destination = "/topic/room." + message.getRoom().getId();
@@ -80,7 +83,7 @@ public class MessageControllerREST {
 
         log.info("Request received to fetch edit history for message: {} by user: {}", messageId, userPrincipal.getUsername());
         
-        java.util.List<com.chat.app.dto.MessageRevisionResponse> responses = messageService.getMessageEditHistory(messageId, userPrincipal.getId());
+        java.util.List<com.chat.app.dto.MessageRevisionResponse> responses = messageRevisionService.getMessageEditHistory(messageId, userPrincipal.getId());
         return ResponseEntity.ok(responses);
     }
 }

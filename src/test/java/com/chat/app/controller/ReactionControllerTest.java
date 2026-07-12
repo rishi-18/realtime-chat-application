@@ -3,7 +3,7 @@ package com.chat.app.controller;
 import com.chat.app.dto.ReactionRequest;
 import com.chat.app.dto.ReactionSyncResponse;
 import com.chat.app.security.UserPrincipal;
-import com.chat.app.service.MessageService;
+import com.chat.app.service.MessageReactionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class ReactionControllerTest {
     private MockMvc mockMvc;
 
     @Mock
-    private MessageService messageService;
+    private MessageReactionService messageReactionService;
 
     @Mock
     private SimpMessagingTemplate messagingTemplate;
@@ -74,7 +74,7 @@ class ReactionControllerTest {
                 .username(userPrincipal.getUsername())
                 .build();
 
-        when(messageService.toggleReaction(eq(messageId), eq("🚀"), any(UUID.class))).thenReturn(response);
+        when(messageReactionService.toggleReaction(eq(messageId), eq("🚀"), any(UUID.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/messages/" + messageId + "/reactions")
                         .contentType(MediaType.APPLICATION_JSON)
