@@ -30,7 +30,9 @@ class MediaControllerTest {
     @BeforeEach
     void setUp() {
         MediaController mediaController = new MediaController(s3Service);
-        mockMvc = MockMvcBuilders.standaloneSetup(mediaController).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(mediaController)
+                .setControllerAdvice(new com.chat.app.exception.GlobalExceptionHandler())
+                .build();
     }
 
     @Test
@@ -60,7 +62,7 @@ class MediaControllerTest {
 
         mockMvc.perform(multipart("/api/v1/media/upload").file(mockFile))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("Uploaded file must not be empty."));
     }
 
@@ -75,7 +77,7 @@ class MediaControllerTest {
 
         mockMvc.perform(multipart("/api/v1/media/upload").file(mockFile))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("Unsupported file content type: application/x-msdownload"));
     }
 
@@ -107,7 +109,7 @@ class MediaControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("Unsupported file content type: application/x-msdownload"));
     }
 }

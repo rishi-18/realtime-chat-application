@@ -33,18 +33,18 @@ public class MediaController {
     );
 
     @PostMapping("/upload")
-    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<AttachmentResponse> uploadFile(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, "Uploaded file must not be empty."));
+            throw new IllegalArgumentException("Uploaded file must not be empty.");
         }
 
         if (file.getSize() > MAX_FILE_SIZE) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, "File size exceeds maximum limit of 10MB."));
+            throw new IllegalArgumentException("File size exceeds maximum limit of 10MB.");
         }
 
         String contentType = file.getContentType();
         if (contentType == null || !PERMITTED_TYPES.contains(contentType.toLowerCase())) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, "Unsupported file content type: " + contentType));
+            throw new IllegalArgumentException("Unsupported file content type: " + contentType);
         }
 
         try {
@@ -75,18 +75,17 @@ public class MediaController {
 
         } catch (IOException ex) {
             log.error("Failed to write uploaded file to disk", ex);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse(false, "Internal server error during file upload."));
+            throw new RuntimeException("Internal server error during file upload.", ex);
         }
     }
 
     @PostMapping("/pre-signed-url")
-    public ResponseEntity<?> getPreSignedUrl(@RequestBody @jakarta.validation.Valid com.chat.app.dto.PreSignedUrlRequest request) {
+    public ResponseEntity<com.chat.app.dto.PreSignedUrlResponse> getPreSignedUrl(@RequestBody @jakarta.validation.Valid com.chat.app.dto.PreSignedUrlRequest request) {
         log.info("Request received to generate pre-signed upload URL for file: {}", request.getFileName());
         
         String contentType = request.getContentType();
         if (contentType == null || !PERMITTED_TYPES.contains(contentType.toLowerCase())) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, "Unsupported file content type: " + contentType));
+            throw new IllegalArgumentException("Unsupported file content type: " + contentType);
         }
 
         com.chat.app.dto.PreSignedUrlResponse response = s3Service.generatePreSignedUrl(request.getFileName(), contentType);
