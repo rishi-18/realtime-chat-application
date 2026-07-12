@@ -35,7 +35,9 @@ class RoomInviteServiceTest {
     @Mock
     private UserRepository userRepository;
 
-    @InjectMocks
+    @Mock
+    private RoomService roomService;
+
     private RoomInviteService roomInviteService;
 
     private User creator;
@@ -44,6 +46,13 @@ class RoomInviteServiceTest {
 
     @BeforeEach
     void setUp() {
+        roomInviteService = new RoomInviteService(
+                roomRepository,
+                roomMemberRepository,
+                roomInviteRepository,
+                userRepository,
+                roomService
+        );
         creator = User.builder()
                 .id(UUID.randomUUID())
                 .username("creator")
@@ -115,9 +124,6 @@ class RoomInviteServiceTest {
                 .id(UUID.randomUUID())
                 .room(room)
                 .code(code)
-                .maxUses(10)
-                .uses(0)
-                .createdAt(Instant.now())
                 .build();
 
         User joiningUser = User.builder()
@@ -126,45 +132,11 @@ class RoomInviteServiceTest {
                 .build();
 
         when(roomInviteRepository.findByCode(code)).thenReturn(Optional.of(invite));
-        when(roomMemberRepository.findById(new RoomMemberId(room.getId(), joiningUser.getId())))
-                .thenReturn(Optional.empty());
-        when(userRepository.findById(joiningUser.getId())).thenReturn(Optional.of(joiningUser));
-        when(roomInviteRepository.incrementUsesAtomic(invite.getId())).thenReturn(1);
 
         // Act
         roomInviteService.joinRoomByInvite(code, joiningUser.getId());
 
         // Assert
-        verify(roomMemberRepository, times(1)).save(any(RoomMember.class));
-    }
-
-    @Test
-    void joinRoomByInvite_ThrowsException_WhenLimitReached() {
-        // Arrange
-        String code = "abcdefgh";
-        RoomInvite invite = RoomInvite.builder()
-                .id(UUID.randomUUID())
-                .room(room)
-                .code(code)
-                .maxUses(5)
-                .uses(5)
-                .createdAt(Instant.now())
-                .build();
-
-        User joiningUser = User.builder()
-                .id(UUID.randomUUID())
-                .username("joining")
-                .build();
-
-        when(roomInviteRepository.findByCode(code)).thenReturn(Optional.of(invite));
-        when(roomMemberRepository.findById(new RoomMemberId(room.getId(), joiningUser.getId())))
-                .thenReturn(Optional.empty());
-        when(userRepository.findById(joiningUser.getId())).thenReturn(Optional.of(joiningUser));
-        when(roomInviteRepository.incrementUsesAtomic(invite.getId())).thenReturn(0);
-
-        // Act & Assert
-        assertThrows(IllegalArgumentException.class, () -> {
-            roomInviteService.joinRoomByInvite(code, joiningUser.getId());
-        });
+        verify(roomService, times(1)).joinRoomWithInvite(room.getId(), joiningUser.getId(), code);
     }
 }

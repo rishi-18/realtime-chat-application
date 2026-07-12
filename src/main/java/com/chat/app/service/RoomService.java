@@ -28,6 +28,7 @@ public class RoomService {
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final com.chat.app.service.UserBlockService userBlockService;
+    private final List<com.chat.app.service.strategy.RoomJoinStrategy> joinStrategies;
 
     @Transactional
     public Room createOrGetDirectMessageRoom(UUID creatorId, UUID recipientId) {
@@ -146,29 +147,23 @@ public class RoomService {
 
     @Transactional
     public void joinRoom(UUID roomId, UUID userId) {
+        joinRoomWithInvite(roomId, userId, null);
+    }
+
+    @Transactional
+    public void joinRoomWithInvite(UUID roomId, UUID userId, String inviteCode) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new RoomNotFoundException("Room not found with id: " + roomId));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
 
-        if (roomMemberRepository.existsByIdRoomIdAndIdUserId(roomId, userId)) {
-            throw new IllegalArgumentException("You are already a member of this room.");
-        }
+        com.chat.app.service.strategy.RoomJoinStrategy strategy = joinStrategies.stream()
+                .filter(s -> s.supports(room.getRoomType()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unsupported room join strategy for type: " + room.getRoomType()));
 
-        RoomMemberId membershipId = RoomMemberId.builder()
-                .roomId(roomId)
-                .userId(userId)
-                .build();
-
-        RoomMember membership = RoomMember.builder()
-                .id(membershipId)
-                .room(room)
-                .user(user)
-                .role(com.chat.app.model.RoomRole.MEMBER)
-                .build();
-
-        roomMemberRepository.save(membership);
+        strategy.join(room, user, inviteCode);
     }
 
     @Transactional(readOnly = true)

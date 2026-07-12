@@ -2,7 +2,6 @@ package com.chat.app.config;
 
 import com.chat.app.dto.ApiResponse;
 import com.chat.app.security.UserPrincipal;
-import io.github.bucket4j.Bucket;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +28,7 @@ class RateLimitingInterceptorTest {
     private RateLimitingInterceptor rateLimitingInterceptor;
 
     @Mock
-    private RateLimitConfig rateLimitConfig;
+    private RedisRateLimiter redisRateLimiter;
 
     @Mock
     private SimpMessagingTemplate messagingTemplate;
@@ -37,15 +36,12 @@ class RateLimitingInterceptorTest {
     @Mock
     private MessageChannel messageChannel;
 
-    @Mock
-    private Bucket bucket;
-
     private UserPrincipal userPrincipal;
     private Principal authPrincipal;
 
     @BeforeEach
     void setUp() {
-        rateLimitingInterceptor = new RateLimitingInterceptor(rateLimitConfig, messagingTemplate);
+        rateLimitingInterceptor = new RateLimitingInterceptor(redisRateLimiter, messagingTemplate);
         userPrincipal = new UserPrincipal(
                 UUID.randomUUID(),
                 "testuser",
@@ -64,8 +60,8 @@ class RateLimitingInterceptorTest {
         accessor.setSessionId("session-1");
         Message<String> message = MessageBuilder.createMessage("hello", accessor.getMessageHeaders());
 
-        when(rateLimitConfig.resolveWsBucket(userPrincipal.getId().toString())).thenReturn(bucket);
-        when(bucket.tryConsume(1)).thenReturn(true);
+        String redisKey = "ratelimit:ws:" + userPrincipal.getId();
+        when(redisRateLimiter.tryConsume(redisKey, 30, 60)).thenReturn(true);
 
         // Act
         Message<?> result = rateLimitingInterceptor.preSend(message, messageChannel);
@@ -84,8 +80,8 @@ class RateLimitingInterceptorTest {
         accessor.setSessionId("session-1");
         Message<String> message = MessageBuilder.createMessage("hello", accessor.getMessageHeaders());
 
-        when(rateLimitConfig.resolveWsBucket(userPrincipal.getId().toString())).thenReturn(bucket);
-        when(bucket.tryConsume(1)).thenReturn(false);
+        String redisKey = "ratelimit:ws:" + userPrincipal.getId();
+        when(redisRateLimiter.tryConsume(redisKey, 30, 60)).thenReturn(false);
 
         // Act
         Message<?> result = rateLimitingInterceptor.preSend(message, messageChannel);

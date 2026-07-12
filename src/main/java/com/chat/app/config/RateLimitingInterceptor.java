@@ -2,7 +2,6 @@ package com.chat.app.config;
 
 import com.chat.app.dto.ApiResponse;
 import com.chat.app.security.UserPrincipal;
-import io.github.bucket4j.Bucket;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.Message;
@@ -21,11 +20,11 @@ import java.security.Principal;
 @Slf4j
 public class RateLimitingInterceptor implements ChannelInterceptor {
 
-    private final RateLimitConfig rateLimitConfig;
+    private final RedisRateLimiter redisRateLimiter;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public RateLimitingInterceptor(RateLimitConfig rateLimitConfig, @Lazy SimpMessagingTemplate messagingTemplate) {
-        this.rateLimitConfig = rateLimitConfig;
+    public RateLimitingInterceptor(RedisRateLimiter redisRateLimiter, @Lazy SimpMessagingTemplate messagingTemplate) {
+        this.redisRateLimiter = redisRateLimiter;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -39,9 +38,9 @@ public class RateLimitingInterceptor implements ChannelInterceptor {
                 if (auth.getPrincipal() instanceof UserPrincipal) {
                     UserPrincipal userPrincipal = (UserPrincipal) auth.getPrincipal();
                     String key = userPrincipal.getId().toString();
-                    Bucket bucket = rateLimitConfig.resolveWsBucket(key);
+                    String redisKey = "ratelimit:ws:" + key;
 
-                    if (!bucket.tryConsume(1)) {
+                    if (!redisRateLimiter.tryConsume(redisKey, 30, 60)) {
                         log.warn("WebSocket rate limit hit for user: {}", userPrincipal.getUsername());
                         
                         // Send error to user queue

@@ -7,6 +7,7 @@ import com.chat.app.model.Room;
 import com.chat.app.model.RoomMember;
 import com.chat.app.model.RoomMemberId;
 import com.chat.app.model.User;
+import com.chat.app.model.RoomType;
 import com.chat.app.repository.RoomMemberRepository;
 import com.chat.app.repository.RoomRepository;
 import com.chat.app.repository.UserRepository;
@@ -17,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,7 +44,6 @@ class RoomServiceTest {
     @Mock
     private com.chat.app.service.UserBlockService userBlockService;
 
-    @InjectMocks
     private RoomService roomService;
 
     private User creator;
@@ -50,6 +51,19 @@ class RoomServiceTest {
 
     @BeforeEach
     void setUp() {
+        List<com.chat.app.service.strategy.RoomJoinStrategy> strategies = new java.util.ArrayList<>();
+        strategies.add(new com.chat.app.service.strategy.PublicRoomJoinStrategy(roomMemberRepository));
+        strategies.add(new com.chat.app.service.strategy.PrivateRoomJoinStrategy(roomMemberRepository, mock(com.chat.app.repository.RoomInviteRepository.class)));
+        strategies.add(new com.chat.app.service.strategy.DmRoomJoinStrategy());
+
+        roomService = new RoomService(
+                roomRepository,
+                roomMemberRepository,
+                userRepository,
+                messageRepository,
+                userBlockService,
+                strategies
+        );
         creator = User.builder()
                 .id(UUID.randomUUID())
                 .username("creator")
@@ -103,7 +117,7 @@ class RoomServiceTest {
         // Arrange
         UUID roomId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Room room = Room.builder().id(roomId).name("developers").build();
+        Room room = Room.builder().id(roomId).name("developers").roomType(RoomType.PUBLIC_GROUP).build();
         User user = User.builder().id(userId).username("newcomer").build();
 
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));
@@ -132,7 +146,7 @@ class RoomServiceTest {
         // Arrange
         UUID roomId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Room room = Room.builder().id(roomId).name("developers").build();
+        Room room = Room.builder().id(roomId).name("developers").roomType(RoomType.PUBLIC_GROUP).build();
         User user = User.builder().id(userId).username("newcomer").build();
 
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(room));

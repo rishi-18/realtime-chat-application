@@ -1,7 +1,6 @@
 package com.chat.app.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,7 +23,7 @@ class RateLimitingFilterTest {
     private RateLimitingFilter rateLimitingFilter;
 
     @Mock
-    private RateLimitConfig rateLimitConfig;
+    private RedisRateLimiter redisRateLimiter;
 
     @Mock
     private HttpServletRequest request;
@@ -35,22 +34,18 @@ class RateLimitingFilterTest {
     @Mock
     private FilterChain filterChain;
 
-    @Mock
-    private Bucket bucket;
-
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        rateLimitingFilter = new RateLimitingFilter(rateLimitConfig, objectMapper);
+        rateLimitingFilter = new RateLimitingFilter(redisRateLimiter, objectMapper);
     }
 
     @Test
     void doFilterInternal_AllowsRequest_WhenTokensAvailable() throws Exception {
         // Arrange
         when(request.getRemoteAddr()).thenReturn("127.0.0.1");
-        when(rateLimitConfig.resolveHttpBucket("ip:127.0.0.1")).thenReturn(bucket);
-        when(bucket.tryConsume(1)).thenReturn(true);
+        when(redisRateLimiter.tryConsume("ratelimit:http:ip:127.0.0.1", 100, 60)).thenReturn(true);
 
         // Act
         rateLimitingFilter.doFilterInternal(request, response, filterChain);
@@ -64,8 +59,7 @@ class RateLimitingFilterTest {
     void doFilterInternal_RejectsRequest_WhenRateLimitExceeded() throws Exception {
         // Arrange
         when(request.getRemoteAddr()).thenReturn("127.0.0.1");
-        when(rateLimitConfig.resolveHttpBucket("ip:127.0.0.1")).thenReturn(bucket);
-        when(bucket.tryConsume(1)).thenReturn(false);
+        when(redisRateLimiter.tryConsume("ratelimit:http:ip:127.0.0.1", 100, 60)).thenReturn(false);
 
         StringWriter stringWriter = new StringWriter();
         PrintWriter printWriter = new PrintWriter(stringWriter);

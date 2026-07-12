@@ -2,6 +2,7 @@ package com.chat.app.controller;
 
 import com.chat.app.dto.AttachmentResponse;
 import com.chat.app.dto.ApiResponse;
+import com.chat.app.exception.MediaException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,16 +36,16 @@ public class MediaController {
     @PostMapping("/upload")
     public ResponseEntity<AttachmentResponse> uploadFile(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            throw new IllegalArgumentException("Uploaded file must not be empty.");
+            throw new MediaException("Uploaded file must not be empty.", "FILE_EMPTY");
         }
 
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("File size exceeds maximum limit of 10MB.");
+            throw new MediaException("File size exceeds maximum limit of 10MB.", "FILE_TOO_LARGE");
         }
 
         String contentType = file.getContentType();
         if (contentType == null || !PERMITTED_TYPES.contains(contentType.toLowerCase())) {
-            throw new IllegalArgumentException("Unsupported file content type: " + contentType);
+            throw new MediaException("Unsupported file content type: " + contentType, "INVALID_FILE_TYPE");
         }
 
         try {
@@ -75,7 +76,7 @@ public class MediaController {
 
         } catch (IOException ex) {
             log.error("Failed to write uploaded file to disk", ex);
-            throw new RuntimeException("Internal server error during file upload.", ex);
+            throw new MediaException("Internal server error during file upload.", "UPLOAD_FAILED", ex);
         }
     }
 
@@ -85,7 +86,7 @@ public class MediaController {
         
         String contentType = request.getContentType();
         if (contentType == null || !PERMITTED_TYPES.contains(contentType.toLowerCase())) {
-            throw new IllegalArgumentException("Unsupported file content type: " + contentType);
+            throw new MediaException("Unsupported file content type: " + contentType, "INVALID_FILE_TYPE");
         }
 
         com.chat.app.dto.PreSignedUrlResponse response = s3Service.generatePreSignedUrl(request.getFileName(), contentType);

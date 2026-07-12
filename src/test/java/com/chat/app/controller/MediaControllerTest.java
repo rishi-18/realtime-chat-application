@@ -62,7 +62,7 @@ class MediaControllerTest {
 
         mockMvc.perform(multipart("/api/v1/media/upload").file(mockFile))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value("FILE_EMPTY"))
                 .andExpect(jsonPath("$.message").value("Uploaded file must not be empty."));
     }
 
@@ -77,7 +77,7 @@ class MediaControllerTest {
 
         mockMvc.perform(multipart("/api/v1/media/upload").file(mockFile))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value("INVALID_FILE_TYPE"))
                 .andExpect(jsonPath("$.message").value("Unsupported file content type: application/x-msdownload"));
     }
 
@@ -109,7 +109,7 @@ class MediaControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value("INVALID_FILE_TYPE"))
                 .andExpect(jsonPath("$.message").value("Unsupported file content type: application/x-msdownload"));
     }
 }

@@ -3,7 +3,6 @@ package com.chat.app.config;
 import com.chat.app.exception.ErrorResponse;
 import com.chat.app.security.UserPrincipal;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +24,7 @@ import java.util.Collections;
 @Slf4j
 public class RateLimitingFilter extends OncePerRequestFilter {
 
-    private final RateLimitConfig rateLimitConfig;
+    private final RedisRateLimiter redisRateLimiter;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -34,9 +33,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
         // Resolve rate limit key
         String key = resolveKey(request);
-        Bucket bucket = rateLimitConfig.resolveHttpBucket(key);
+        String redisKey = "ratelimit:http:" + key;
 
-        if (!bucket.tryConsume(1)) {
+        if (!redisRateLimiter.tryConsume(redisKey, 100, 60)) {
             log.warn("Rate limit exceeded for client: {} on route: {}", key, request.getRequestURI());
             
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());

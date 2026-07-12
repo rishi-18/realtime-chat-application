@@ -16,8 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
+@lombok.extern.slf4j.Slf4j
 public class RoomInviteService {
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -28,6 +27,20 @@ public class RoomInviteService {
     private final RoomMemberRepository roomMemberRepository;
     private final RoomInviteRepository roomInviteRepository;
     private final UserRepository userRepository;
+    private final RoomService roomService;
+
+    public RoomInviteService(
+            RoomRepository roomRepository,
+            RoomMemberRepository roomMemberRepository,
+            RoomInviteRepository roomInviteRepository,
+            UserRepository userRepository,
+            @org.springframework.context.annotation.Lazy RoomService roomService) {
+        this.roomRepository = roomRepository;
+        this.roomMemberRepository = roomMemberRepository;
+        this.roomInviteRepository = roomInviteRepository;
+        this.userRepository = userRepository;
+        this.roomService = roomService;
+    }
 
     @Transactional
     public RoomInviteResponse createInvite(UUID roomId, RoomInviteCreateRequest request, UUID creatorId) {
@@ -71,36 +84,8 @@ public class RoomInviteService {
         RoomInvite invite = roomInviteRepository.findByCode(code)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or non-existent invite code."));
 
-        if (invite.getExpiresAt() != null && invite.getExpiresAt().isBefore(Instant.now())) {
-            throw new IllegalArgumentException("The invite link has expired.");
-        }
-
-        UUID roomId = invite.getRoom().getId();
-        Optional<RoomMember> existing = roomMemberRepository.findById(new RoomMemberId(roomId, userId));
-        if (existing.isPresent()) {
-            throw new IllegalArgumentException("You are already a member of this room.");
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
-
-        // Atomic check and increment
-        int affectedRows = roomInviteRepository.incrementUsesAtomic(invite.getId());
-        if (affectedRows == 0) {
-            throw new IllegalArgumentException("The invite link has reached its maximum usage limit.");
-        }
-
-        RoomMemberId membershipId = new RoomMemberId(roomId, userId);
-        RoomMember membership = RoomMember.builder()
-                .id(membershipId)
-                .room(invite.getRoom())
-                .user(user)
-                .role(RoomRole.MEMBER)
-                .joinedAt(Instant.now())
-                .build();
-
-        roomMemberRepository.save(membership);
-        log.info("User {} joined room {} successfully via invite code {}", userId, roomId, code);
+        roomService.joinRoomWithInvite(invite.getRoom().getId(), userId, code);
+        log.info("User {} joined room {} successfully via invite code {}", userId, invite.getRoom().getId(), code);
     }
 
     private String generateUniqueCode() {

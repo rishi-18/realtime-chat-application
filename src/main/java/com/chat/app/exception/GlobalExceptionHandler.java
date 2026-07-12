@@ -145,6 +145,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
+    @ExceptionHandler(MediaException.class)
+    public ResponseEntity<ErrorResponse> handleMediaException(MediaException ex) {
+        HttpStatus status = "FILE_TOO_LARGE".equals(ex.getErrorCode()) 
+                ? HttpStatus.PAYLOAD_TOO_LARGE 
+                : HttpStatus.BAD_REQUEST;
+
+        ErrorResponse response = ErrorResponse.builder()
+                .status(status.value())
+                .error(status.getReasonPhrase())
+                .message(ex.getMessage())
+                .code(ex.getErrorCode())
+                .details(Collections.emptyList())
+                .build();
+        return ResponseEntity.status(status).body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Unhandled exception occurred", ex);
