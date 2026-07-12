@@ -29,6 +29,7 @@ public class RoomController {
     private final MessageService messageService;
     private final RoomMemberRepository roomMemberRepository;
     private final PresenceService presenceService;
+    private final com.chat.app.service.RoomInviteService roomInviteService;
 
     @PostMapping
     public ResponseEntity<RoomResponse> createRoom(
@@ -138,5 +139,22 @@ public class RoomController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         roomService.kickMember(roomId, userId, userPrincipal.getId());
         return ResponseEntity.ok(new ApiResponse(true, "User kicked successfully."));
+    }
+
+    @PostMapping("/{roomId}/invites")
+    public ResponseEntity<com.chat.app.dto.RoomInviteResponse> createInvite(
+            @PathVariable UUID roomId,
+            @Valid @RequestBody com.chat.app.dto.RoomInviteCreateRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        com.chat.app.dto.RoomInviteResponse response = roomInviteService.createInvite(roomId, request, userPrincipal.getId());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/join-by-invite/{code}")
+    public ResponseEntity<ApiResponse> joinRoomByInvite(
+            @PathVariable String code,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        roomInviteService.joinRoomByInvite(code, userPrincipal.getId());
+        return ResponseEntity.ok(new ApiResponse(true, "Successfully joined the room."));
     }
 }

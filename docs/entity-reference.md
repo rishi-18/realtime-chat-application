@@ -122,3 +122,18 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `oldContent`: TEXT column containing the message content prior to edit.
   - `editedAt`: Timestamp.
 - **Validation**: `oldContent` must not be blank and conforms to character limit bounds. Indexing on `message_id` optimizes historical lookup times.
+
+---
+
+## 11. RoomInvite Entity
+- **Purpose**: Represents an invite code linked to a room, permitting membership joins upon verification.
+- **Properties**:
+  - `id`: UUID Primary Key, auto-generated.
+  - `room`: Lazy `Room` reference (Cascades deletes on room deletion).
+  - `code`: Unique String token identifying the invite link.
+  - `createdBy`: Lazy `User` reference who generated the invite.
+  - `maxUses`: Nullable Integer specifying usage limits.
+  - `uses`: Integer recording current usage counts.
+  - `expiresAt`: Nullable Timestamp of token expiration.
+  - `createdAt`: Timestamp.
+- **Validation**: `code` must be unique and not blank. `uses` must be non-negative. B-Tree indexing on `code` ensures fast lookup queries.

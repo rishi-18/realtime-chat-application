@@ -50,6 +50,9 @@ class RoomControllerTest {
     @Mock
     private PresenceService presenceService;
 
+    @Mock
+    private com.chat.app.service.RoomInviteService roomInviteService;
+
     @InjectMocks
     private RoomController roomController;
 
@@ -103,5 +106,42 @@ class RoomControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("User kicked successfully."));
+    }
+
+    @Test
+    void createInvite_Success() throws Exception {
+        UUID roomId = UUID.randomUUID();
+        com.chat.app.dto.RoomInviteCreateRequest request = new com.chat.app.dto.RoomInviteCreateRequest(5, 3600L);
+        com.chat.app.dto.RoomInviteResponse mockResponse = com.chat.app.dto.RoomInviteResponse.builder()
+                .id(UUID.randomUUID())
+                .roomId(roomId)
+                .code("abc123xy")
+                .maxUses(5)
+                .uses(0)
+                .build();
+
+        when(roomInviteService.createInvite(eq(roomId), any(com.chat.app.dto.RoomInviteCreateRequest.class), any(UUID.class)))
+                .thenReturn(mockResponse);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/rooms/" + roomId + "/invites")
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("abc123xy"))
+                .andExpect(jsonPath("$.maxUses").value(5));
+    }
+
+    @Test
+    void joinRoomByInvite_Success() throws Exception {
+        String code = "abc123xy";
+        doNothing().when(roomInviteService).joinRoomByInvite(eq(code), any(UUID.class));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/rooms/join-by-invite/" + code)
+                        .with(user(userPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Successfully joined the room."));
     }
 }

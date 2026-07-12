@@ -418,3 +418,25 @@ We chose **Option B (Redis Pub/Sub)**. Real-time chat features like typing alert
 
 ### Final Decision & Rationale
 We chose **Option B (Pre-signed PUT S3 URLs)**. Direct client-to-S3 uploads avoid proxying large media files through backend instances, saving CPU, memory, and network resources. The backend remains lightweight and stateless, generating pre-signed tokens while offloading binary data transfers to S3. To keep local development simple, we implement a fallback to local uploads if S3 credentials are not configured.
+
+---
+
+## Decision 22: Invite Token Format Choice
+
+- **Context**: Choosing the formatting schema for room invite code generators.
+- **Date**: 2026-07-12
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: UUIDv4 String [Rejected]**.
+  - **Option B: Secure Alphanumeric Token (SecureRandom, length = 8) [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (UUIDv4) | Option B (Alphanumeric Token) [Chosen] |
+| :--- | :--- | :--- |
+| **User Friendliness** | Low (36-character string is difficult to share or read) | **High** (8-character alphanumeric string like `x8aB9fGh` is easy to share) |
+| **Uniqueness / Collision** | **Extremely Low Collision** | Low Collision (Covers $62^8 \approx 2.18 \times 10^{14}$ unique combinations, safe for our scope) |
+| **Search Performance** | High (Indexed UUID lookup) | High (Indexed String B-Tree lookup) |
+
+### Final Decision & Rationale
+We chose **Option B (Secure Alphanumeric Token)**. Standard UUIDs are too long for user-facing links. An 8-character alphanumeric string generated using `SecureRandom` is much easier to read and share, while providing enough entropy ($62^8$) to prevent brute-force attacks. We enforce uniqueness with a database constraint on `room_invites.code`.

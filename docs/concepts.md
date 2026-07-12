@@ -402,3 +402,30 @@ To avoid server saturation, we offload file uploads directly to AWS S3:
 If S3 configuration credentials (bucket name, region, or access keys) are missing or invalid:
 - The server falls back to returning a local storage upload URL path.
 - The client detects this and uploads to the backend local file server. This keeps the application functional during misconfigurations or cloud service outages.
+
+---
+
+## 21. Private Room Invites & Atomic Usage Tracking
+
+Private channels (`RoomType.PRIVATE_GROUP`) restrict member access. Instead of listing rooms publicly, access is controlled using invite codes.
+
+### 1. Cryptographically Secure Invite Codes
+Invite links rely on short, random tokens (e.g. alphanumeric strings like `x8aB9fGh`) to identify the target room.
+*   Codes are generated using a cryptographically secure random number generator (`SecureRandom`) to prevent brute-force attacks.
+*   Each invite is mapped to a specific room ID, owner ID, expiration date, and usage limit.
+
+### 2. Concurrency Safety & Atomic Usage Increments
+When multiple users join a private room simultaneously using the same invite link:
+- A naive check-then-act flow can lead to race conditions where the usage limit is exceeded:
+  ```
+  User 1 -> Check uses < max_uses (true) -------------------> Increment uses -> Save
+  User 2 -------> Check uses < max_uses (true) -> Increment uses -> Save
+  ```
+- **Solution**: We use Spring Data JPA `@Modifying` queries with atomic updates to increment the usage count directly in the database:
+  ```sql
+  UPDATE room_invites SET uses = uses + 1 WHERE id = :id AND (max_uses IS NULL OR uses < max_uses);
+  ```
+  If the update returns `0` affected rows, it means the usage limit has been exceeded, and we reject the join request.
+
+### 3. Expiration Gates
+Each invite is validated against `Instant.now()`. If `expires_at` is set and has passed, the join request is rejected. Orphaning invites is prevented by using cascade deletes on the parent room.

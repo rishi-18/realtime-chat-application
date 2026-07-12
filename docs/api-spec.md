@@ -140,6 +140,49 @@ Kicks a member out of a room. Only room owners or moderators can execute this. M
     - `403 Forbidden`: `ACCESS_DENIED` (Insufficient role permissions, or moderator trying to kick the owner).
     - `404 Not Found`: `ROOM_MEMBER_NOT_FOUND` (Target member does not exist in this room).
 
+### Create Room Invite Link
+Generates an invite code for a room. Only owners or moderators can execute this.
+*   **Route**: `POST /rooms/{roomId}/invites`
+*   **Authentication**: Required (Valid Access Token)
+*   **Request Body**:
+    - `maxUses` (number, optional): Maximum number of times the invite can be used.
+    - `expirationSeconds` (number, optional): Time in seconds before the invite code expires.
+    ```json
+    {
+      "maxUses": 5,
+      "expirationSeconds": 3600
+    }
+    ```
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "id": "e3b0c442-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "roomId": "76161474-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "code": "aBCdEfGh",
+      "maxUses": 5,
+      "uses": 0,
+      "expiresAt": "2026-07-12T13:55:00Z"
+    }
+    ```
+*   **Errors**:
+    - `403 Forbidden`: `ACCESS_DENIED` (User is not authorized to create invites).
+
+### Join Room by Invite Code
+Registers the requesting user to a room using a valid invite code.
+*   **Route**: `POST /rooms/join-by-invite/{code}`
+*   **Authentication**: Required (Valid Access Token)
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "success": true,
+      "message": "Successfully joined the room."
+    }
+    ```
+*   **Errors**:
+    - `400 Bad Request`: `INVITE_EXPIRED` (Invite code has expired).
+    - `400 Bad Request`: `INVITE_LIMIT_EXCEEDED` (Invite code has hit its maximum usage limit).
+    - `404 Not Found`: `INVITE_NOT_FOUND` (Invite code does not exist).
+
 ### Upload Media Attachment
 Uploads a file or image to be attached to a message.
 *   **Route**: `POST /media/upload`

@@ -60,5 +60,14 @@ public class DatabaseInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Could not run message revisions schema migrations. Error: {}", e.getMessage());
         }
+
+        log.info("Checking room_invites table and creating indexing...");
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS room_invites (id UUID PRIMARY KEY, room_id UUID REFERENCES rooms(id) ON DELETE CASCADE, code VARCHAR(50) UNIQUE NOT NULL, created_by UUID REFERENCES users(id) ON DELETE SET NULL, max_uses INTEGER, uses INTEGER NOT NULL DEFAULT 0, expires_at TIMESTAMP, created_at TIMESTAMP NOT NULL)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_invites_code ON room_invites(code)");
+            log.info("Room invites table schema and indexing configured successfully.");
+        } catch (Exception e) {
+            log.warn("Could not run room invites schema migrations. Error: {}", e.getMessage());
+        }
     }
 }

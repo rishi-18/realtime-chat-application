@@ -165,3 +165,11 @@ graph TD
 - The client calls `POST /api/v1/media/pre-signed-url` providing file metadata. The server generates a pre-signed S3 upload URL.
 - Local storage configurations act as fallbacks if S3 keys or credentials are not defined.
 - Once the upload completes, S3 files are delivered via CloudFront CDN routes.
+
+### 19. Private Channels & Invite Links
+- Private rooms (`room_type = PRIVATE_GROUP`) are introduced. Unlike public groups, users cannot join them without a valid invite.
+- Room owners or moderators can create single-use or multi-use time-limited invite links: `POST /api/v1/rooms/{roomId}/invites`.
+- The system generates a secure, random invite code mapped to a target room, specifying an expiration time and usage limit.
+- Users join private channels using `POST /api/v1/rooms/join-by-invite/{code}`.
+- If the invite code is valid, has not expired, and has not exceeded its usage limit, the user is added to the room as a `MEMBER`.
+- Usage count increments are handled using atomic database updates to prevent race conditions.

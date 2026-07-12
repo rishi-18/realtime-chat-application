@@ -84,6 +84,18 @@ erDiagram
         text old_content
         timestamp edited_at
     }
+    room_invites {
+        uuid id PK
+        uuid room_id FK
+        varchar code
+        uuid created_by FK
+        int max_uses
+        int uses
+        timestamp expires_at
+        timestamp created_at
+    }
+
+    rooms ||--o{ room_invites : "generates"
 
     users ||--o{ refresh_tokens : "generates"
     users ||--o{ rooms : "creates"
@@ -200,6 +212,20 @@ erDiagram
   - `edited_at` (TIMESTAMP, NOT NULL)
 - **Indexes**:
   - `idx_revisions_message` on column `message_id` (B-Tree). Optimized for retrieving revision history for a message.
+
+### Table: `room_invites`
+- **Primary Key**: `id` (UUIDv4)
+- **Foreign Keys**:
+  - `room_id` references `rooms(id)` with `ON DELETE CASCADE`.
+  - `created_by` references `users(id)` with `ON DELETE SET NULL`.
+- **Columns**:
+  - `code` (VARCHAR(50), UNIQUE, NOT NULL)
+  - `max_uses` (INTEGER, NULL)
+  - `uses` (INTEGER, NOT NULL, DEFAULT 0)
+  - `expires_at` (TIMESTAMP, NULL)
+  - `created_at` (TIMESTAMP, NOT NULL)
+- **Indexes**:
+  - `idx_invites_code` on column `code` (B-Tree). Optimized for looking up room details using invite codes.
 
 ---
 
