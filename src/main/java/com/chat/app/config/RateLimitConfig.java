@@ -1,8 +1,6 @@
 package com.chat.app.config;
 
-import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
@@ -25,19 +23,15 @@ public class RateLimitConfig {
 
     private Bucket createNewHttpBucket() {
         // Limit: 100 requests per minute
-        Refill refill = Refill.intervally(100, Duration.ofMinutes(1));
-        Bandwidth limit = Bandwidth.classic(100, refill);
         return Bucket.builder()
-                .addLimit(limit)
+                .addLimit(limit -> limit.capacity(100).refillIntervally(100, Duration.ofMinutes(1)))
                 .build();
     }
 
     private Bucket createNewWsBucket() {
         // Limit: 30 messages per minute (anti-spam)
-        Refill refill = Refill.intervally(30, Duration.ofMinutes(1));
-        Bandwidth limit = Bandwidth.classic(30, refill);
         return Bucket.builder()
-                .addLimit(limit)
+                .addLimit(limit -> limit.capacity(30).refillIntervally(30, Duration.ofMinutes(1)))
                 .build();
     }
 }
