@@ -173,3 +173,10 @@ graph TD
 - Users join private channels using `POST /api/v1/rooms/join-by-invite/{code}`.
 - If the invite code is valid, has not expired, and has not exceeded its usage limit, the user is added to the room as a `MEMBER`.
 - Usage count increments are handled using atomic database updates to prevent race conditions.
+
+### 20. Rate Limiting & Anti-Spam (Token Bucket)
+- To protect REST API endpoints and real-time WebSocket channels from spam and Denial of Service (DoS) attacks, we implement rate limiting.
+- An in-memory/Redis-backed **Token Bucket** algorithm (via Bucket4j) regulates incoming request flows.
+- For HTTP REST APIs, rate limits are enforced at the filter level (`RateLimitingFilter`), restricting requests based on IP address or authenticated User ID.
+- For WebSocket channels, rate limits are checked inside the `ChannelInterceptor` on incoming `SEND` frames.
+- If a client exceeds their limit, the filter returns a `429 Too Many Requests` status, while the WebSocket interceptor drops the frame and pushes a standardized `/queue/errors` warning to the user.

@@ -440,3 +440,25 @@ We chose **Option B (Pre-signed PUT S3 URLs)**. Direct client-to-S3 uploads avoi
 
 ### Final Decision & Rationale
 We chose **Option B (Secure Alphanumeric Token)**. Standard UUIDs are too long for user-facing links. An 8-character alphanumeric string generated using `SecureRandom` is much easier to read and share, while providing enough entropy ($62^8$) to prevent brute-force attacks. We enforce uniqueness with a database constraint on `room_invites.code`.
+
+---
+
+## Decision 23: Rate Limiting Architecture Choice
+
+- **Context**: Choosing the mechanism and library for enforcing rate limits.
+- **Date**: 2026-07-12
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: Spring Cloud Gateway Rate Limiter [Rejected]**.
+  - **Option B: Bucket4j Local In-Memory & Redis Token Bucket [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (Spring Cloud Gateway) | Option B (Bucket4j Local & Redis Fallback) [Chosen] |
+| :--- | :--- | :--- |
+| **Complexity** | High (Requires deploying and configuring a gateway service) | **Low** (Embeds directly into the Spring Boot application) |
+| **WebSocket Throttling** | Poor (Does not inspect individual frames inside active sockets) | **Excellent** (Inspects individual WebSocket frames using a Spring `ChannelInterceptor`) |
+| **Performance Overhead** | Medium (Adds an extra hop in the network path) | **Low** (In-memory execution takes less than 1ms) |
+
+### Final Decision & Rationale
+We chose **Option B (Bucket4j Local & Redis Fallback)**. Bucket4j integrates directly into the application process. This allows us to rate limit both HTTP REST requests (via a filter) and individual WebSocket frames (via a `ChannelInterceptor` checking `SEND` frames). We configure local in-memory token buckets by default, with a Redis-backed proxy fallback for distributed environments.

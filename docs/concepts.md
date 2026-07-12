@@ -429,3 +429,28 @@ When multiple users join a private room simultaneously using the same invite lin
 
 ### 3. Expiration Gates
 Each invite is validated against `Instant.now()`. If `expires_at` is set and has passed, the join request is rejected. Orphaning invites is prevented by using cascade deletes on the parent room.
+
+---
+
+## 22. Token Bucket Rate Limiting & Real-time Throttling
+
+Rate limiting prevents abusive clients from exhausting server resources (spamming API requests or flooding real-time channels with messages).
+
+### 1. Token Bucket Algorithm
+The **Token Bucket** algorithm manages request velocity:
+*   A bucket holds up to $N$ tokens.
+*   Tokens are added to the bucket at a constant refill rate of $R$ tokens per second.
+*   Each request consumes 1 token. If the bucket is empty, the request is rejected.
+*   This allows for short bursts of traffic (up to the capacity $N$) while enforcing a long-term rate limit.
+
+### 2. Client Key Resolution
+To rate limit requests fairly, we resolve key identities:
+*   **Authenticated Requests**: Identified by the User ID (`userPrincipal.getId()`).
+*   **Anonymous Requests**: Identified by the client's IP address (`X-Forwarded-For` or `HttpServletRequest.getRemoteAddr()`).
+*   This prevents a single user from spanning multiple IP addresses to bypass limits.
+
+### 3. Interceptor-level WebSocket Throttling
+WebSocket messages bypass standard servlet filters because they use persistent TCP connections.
+*   We enforce limits by checking the user's token bucket inside a Spring `ChannelInterceptor` on `SEND` frames.
+*   If the user has exceeded their rate limit, the frame is dropped before it reaches the message controllers.
+*   The interceptor sends an error message back to the client over a dedicated websocket channel (`/queue/errors`).
