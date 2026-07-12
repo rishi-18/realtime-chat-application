@@ -62,7 +62,7 @@ class MessageServiceTest {
     private com.chat.app.repository.MessageRevisionRepository messageRevisionRepository;
 
     @Mock
-    private com.chat.app.repository.UserBlockRepository userBlockRepository;
+    private com.chat.app.service.UserBlockService userBlockService;
 
     @InjectMocks
     private MessageService messageService;

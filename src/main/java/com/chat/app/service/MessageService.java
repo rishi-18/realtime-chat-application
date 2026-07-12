@@ -31,7 +31,7 @@ public class MessageService {
     private final com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository;
     private final com.chat.app.repository.MessageRevisionRepository messageRevisionRepository;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
-    private final com.chat.app.repository.UserBlockRepository userBlockRepository;
+    private final com.chat.app.service.UserBlockService userBlockService;
 
     public MessageService(
             MessageRepository messageRepository,
@@ -43,7 +43,7 @@ public class MessageService {
             com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository,
             com.chat.app.repository.MessageRevisionRepository messageRevisionRepository,
             @org.springframework.context.annotation.Lazy org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate,
-            com.chat.app.repository.UserBlockRepository userBlockRepository) {
+            com.chat.app.service.UserBlockService userBlockService) {
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
         this.roomMemberRepository = roomMemberRepository;
@@ -53,7 +53,7 @@ public class MessageService {
         this.pinnedMessageRepository = pinnedMessageRepository;
         this.messageRevisionRepository = messageRevisionRepository;
         this.messagingTemplate = messagingTemplate;
-        this.userBlockRepository = userBlockRepository;
+        this.userBlockService = userBlockService;
     }
 
     @Transactional
@@ -78,8 +78,7 @@ public class MessageService {
             for (com.chat.app.model.RoomMember member : members) {
                 if (!member.getUser().getId().equals(senderId)) {
                     UUID otherUserId = member.getUser().getId();
-                    if (userBlockRepository.existsByUserIdAndBlockedUserId(senderId, otherUserId) ||
-                            userBlockRepository.existsByUserIdAndBlockedUserId(otherUserId, senderId)) {
+                    if (userBlockService.isBlockedSymmetrically(senderId, otherUserId)) {
                         throw new AccessDeniedException("Cannot send message. You have blocked this user or they have blocked you.");
                     }
                 }
@@ -133,8 +132,7 @@ public class MessageService {
                 }
                 userRepository.findByUsername(username).ifPresent(targetUser -> {
                     if (roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), targetUser.getId())) {
-                        if (userBlockRepository.existsByUserIdAndBlockedUserId(sender.getId(), targetUser.getId()) ||
-                                userBlockRepository.existsByUserIdAndBlockedUserId(targetUser.getId(), sender.getId())) {
+                        if (userBlockService.isBlockedSymmetrically(sender.getId(), targetUser.getId())) {
                             return;
                         }
 
@@ -282,8 +280,8 @@ public class MessageService {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
         
         java.util.List<UUID> blockedIds = new java.util.ArrayList<>();
-        blockedIds.addAll(userBlockRepository.findBlockedUserIds(userId));
-        blockedIds.addAll(userBlockRepository.findUsersWhoBlockedMe(userId));
+        blockedIds.addAll(userBlockService.getBlockedUserIds(userId));
+        blockedIds.addAll(userBlockService.getUsersWhoBlockedMeIds(userId));
 
         if (!blockedIds.isEmpty()) {
             return messageRepository.findByRoomIdAndSenderIdNotIn(roomId, blockedIds, pageRequest);

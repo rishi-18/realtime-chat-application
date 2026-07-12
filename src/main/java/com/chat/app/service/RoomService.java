@@ -27,7 +27,7 @@ public class RoomService {
     private final RoomMemberRepository roomMemberRepository;
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
-    private final com.chat.app.repository.UserBlockRepository userBlockRepository;
+    private final com.chat.app.service.UserBlockService userBlockService;
 
     @Transactional
     public Room createOrGetDirectMessageRoom(UUID creatorId, UUID recipientId) {
@@ -35,8 +35,7 @@ public class RoomService {
             throw new IllegalArgumentException("Cannot start a direct message room with yourself.");
         }
 
-        if (userBlockRepository.existsByUserIdAndBlockedUserId(creatorId, recipientId) ||
-                userBlockRepository.existsByUserIdAndBlockedUserId(recipientId, creatorId)) {
+        if (userBlockService.isBlockedSymmetrically(creatorId, recipientId)) {
             throw new org.springframework.security.access.AccessDeniedException("Cannot start a direct message. You have blocked this user or they have blocked you.");
         }
 
@@ -183,8 +182,7 @@ public class RoomService {
             throw new IllegalArgumentException("Cannot start a direct message with yourself.");
         }
 
-        if (userBlockRepository.existsByUserIdAndBlockedUserId(creatorId, recipientId) ||
-                userBlockRepository.existsByUserIdAndBlockedUserId(recipientId, creatorId)) {
+        if (userBlockService.isBlockedSymmetrically(creatorId, recipientId)) {
             throw new org.springframework.security.access.AccessDeniedException("Cannot start a direct message. You have blocked this user or they have blocked you.");
         }
 

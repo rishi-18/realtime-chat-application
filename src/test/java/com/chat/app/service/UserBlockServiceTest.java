@@ -30,12 +30,21 @@ class UserBlockServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private org.springframework.data.redis.core.RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private org.springframework.data.redis.core.ValueOperations<String, Object> valueOperations;
+
+    @Mock
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
     private User user;
     private User target;
 
     @BeforeEach
     void setUp() {
-        userBlockService = new UserBlockService(userBlockRepository, userRepository);
+        userBlockService = new UserBlockService(userBlockRepository, userRepository, redisTemplate, objectMapper);
         user = User.builder().id(UUID.randomUUID()).username("user").email("user@example.com").build();
         target = User.builder().id(UUID.randomUUID()).username("target").email("target@example.com").build();
     }
@@ -82,5 +91,37 @@ class UserBlockServiceTest {
         when(userBlockRepository.existsByUserIdAndBlockedUserId(user.getId(), target.getId())).thenReturn(true);
 
         assertTrue(userBlockService.isBlockedSymmetrically(user.getId(), target.getId()));
+    }
+
+    @Test
+    void getBlockedUserIds_CacheHit() throws Exception {
+        String key = "blocks:initiated:" + user.getId();
+        String cachedJson = "[\"" + target.getId() + "\"]";
+        
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(key)).thenReturn(cachedJson);
+        when(objectMapper.readValue(eq(cachedJson), any(com.fasterxml.jackson.core.type.TypeReference.class)))
+                .thenReturn(Collections.singletonList(target.getId().toString()));
+
+        List<UUID> result = userBlockService.getBlockedUserIds(user.getId());
+
+        assertEquals(1, result.size());
+        assertEquals(target.getId(), result.get(0));
+        verify(userBlockRepository, never()).findBlockedUserIds(any());
+    }
+
+    @Test
+    void getBlockedUserIds_CacheMiss() throws Exception {
+        String key = "blocks:initiated:" + user.getId();
+        
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(key)).thenReturn(null);
+        when(userBlockRepository.findBlockedUserIds(user.getId())).thenReturn(Collections.singletonList(target.getId()));
+
+        List<UUID> result = userBlockService.getBlockedUserIds(user.getId());
+
+        assertEquals(1, result.size());
+        assertEquals(target.getId(), result.get(0));
+        verify(userBlockRepository, times(1)).findBlockedUserIds(user.getId());
     }
 }
