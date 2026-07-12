@@ -137,3 +137,14 @@ This document catalogs the JPA entities, properties, relations, lifecycles, and 
   - `expiresAt`: Nullable Timestamp of token expiration.
   - `createdAt`: Timestamp.
 - **Validation**: `code` must be unique and not blank. `uses` must be non-negative. B-Tree indexing on `code` ensures fast lookup queries.
+
+---
+
+## 12. UserBlock Entity
+- **Purpose**: Represents a blocking relationship established by a user against a target user.
+- **Properties**:
+  - `id`: UUID Primary Key, auto-generated.
+  - `user`: Lazy `User` reference (the blocker user).
+  - `blockedUser`: Lazy `User` reference (the blocked user).
+  - `createdAt`: Timestamp.
+- **Validation**: Cannot block oneself. Composite unique constraint enforces single blocking between two specific users. Indexing on `user_id` and `blocked_user_id` optimizes lookup queries.

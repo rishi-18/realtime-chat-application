@@ -180,3 +180,10 @@ graph TD
 - For HTTP REST APIs, rate limits are enforced at the filter level (`RateLimitingFilter`), restricting requests based on IP address or authenticated User ID.
 - For WebSocket channels, rate limits are checked inside the `ChannelInterceptor` on incoming `SEND` frames.
 - If a client exceeds their limit, the filter returns a `429 Too Many Requests` status, while the WebSocket interceptor drops the frame and pushes a standardized `/queue/errors` warning to the user.
+
+### 21. User Block & Ignore List
+- To enhance privacy and prevent harassment, users can block other users: `POST /api/v1/users/block/{targetUserId}`.
+- Block relationships are stored in the `user_blocks` table with unique constraint mapping (user_id, blocked_user_id).
+- Blocking operates symmetrically to prevent direct messaging (DM) creation and message sending between two blocked users.
+- When sending a message or mention, the system validates that the recipient has not blocked the sender, and vice versa.
+- When listing rooms or active conversations, DMs involving blocked users are filtered out to keep the inbox clean.

@@ -462,3 +462,25 @@ We chose **Option B (Secure Alphanumeric Token)**. Standard UUIDs are too long f
 
 ### Final Decision & Rationale
 We chose **Option B (Bucket4j Local & Redis Fallback)**. Bucket4j integrates directly into the application process. This allows us to rate limit both HTTP REST requests (via a filter) and individual WebSocket frames (via a `ChannelInterceptor` checking `SEND` frames). We configure local in-memory token buckets by default, with a Redis-backed proxy fallback for distributed environments.
+
+---
+
+## Decision 24: Block List Query Filtering Strategy
+
+- **Context**: Choosing where to filter messages involving blocked users.
+- **Date**: 2026-07-12
+- **Status**: Approved
+- **Alternatives Considered**:
+  - **Option A: JVM-level Stream Filtering [Rejected]**.
+  - **Option B: Database-level Query Filtering (SQL `LEFT JOIN` / `NOT IN`) [Chosen]**.
+
+### Trade-off Matrix
+
+| Criteria | Option A (JVM Streams) | Option B (Database Queries) [Chosen] |
+| :--- | :--- | :--- |
+| **Database Overhead** | Low (Queries remain simple) | Medium (Adds extra JOIN checks to query statements) |
+| **Network & Memory Overhead** | High (Fetches all messages, filtering them in JVM memory) | **Low** (Filters records before transmitting them over the network) |
+| **Pagination Accuracy** | Poor (Filtering in the JVM messes up page size counts) | **Excellent** (Database-level filters return correct page sizes) |
+
+### Final Decision & Rationale
+We chose **Option B (Database-level Query Filtering)**. If we fetch messages first and filter them in the JVM, it breaks pagination logic (e.g. a page size of 20 could return only 15 messages after filtering out blocked users). Performing the exclusions directly in SQL queries via `NOT IN` or `LEFT JOIN` checks keeps pagination accurate and avoids transmitting blocked messages over the network.

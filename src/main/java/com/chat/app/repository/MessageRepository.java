@@ -15,6 +15,15 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     Page<Message> findByRoomId(UUID roomId, Pageable pageable);
 
     @org.springframework.data.jpa.repository.Query(
+        "SELECT m FROM Message m WHERE m.room.id = :roomId AND m.sender.id NOT IN :blockedIds"
+    )
+    Page<Message> findByRoomIdAndSenderIdNotIn(
+            @org.springframework.data.repository.query.Param("roomId") UUID roomId,
+            @org.springframework.data.repository.query.Param("blockedIds") java.util.Collection<UUID> blockedIds,
+            Pageable pageable
+    );
+
+    @org.springframework.data.jpa.repository.Query(
         value = "SELECT * FROM messages WHERE room_id = :roomId AND is_deleted = false " +
                 "AND to_tsvector('english', coalesce(content, '')) @@ plainto_tsquery('english', :query)",
         countQuery = "SELECT count(*) FROM messages WHERE room_id = :roomId AND is_deleted = false " +

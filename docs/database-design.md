@@ -94,8 +94,15 @@ erDiagram
         timestamp expires_at
         timestamp created_at
     }
+    user_blocks {
+        uuid id PK
+        uuid user_id FK
+        uuid blocked_user_id FK
+        timestamp created_at
+    }
 
     rooms ||--o{ room_invites : "generates"
+    users ||--o{ user_blocks : "blocks"
 
     users ||--o{ refresh_tokens : "generates"
     users ||--o{ rooms : "creates"
@@ -226,6 +233,19 @@ erDiagram
   - `created_at` (TIMESTAMP, NOT NULL)
 - **Indexes**:
   - `idx_invites_code` on column `code` (B-Tree). Optimized for looking up room details using invite codes.
+
+### Table: `user_blocks`
+- **Primary Key**: `id` (UUIDv4)
+- **Foreign Keys**:
+  - `user_id` references `users(id)` with `ON DELETE CASCADE`.
+  - `blocked_user_id` references `users(id)` with `ON DELETE CASCADE`.
+- **Columns**:
+  - `created_at` (TIMESTAMP, NOT NULL)
+- **Constraints**:
+  - **Unique Constraint**: Unique index on columns `(user_id, blocked_user_id)` (prevents a user from blocking another user multiple times).
+- **Indexes**:
+  - `idx_user_blocks_user` on column `user_id` (B-Tree). Optimized for looking up blocks initiated by a user.
+  - `idx_user_blocks_blocked` on column `blocked_user_id` (B-Tree). Optimized for checking if a user has been blocked.
 
 ---
 

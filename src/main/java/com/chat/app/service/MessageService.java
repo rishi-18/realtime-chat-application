@@ -31,6 +31,7 @@ public class MessageService {
     private final com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository;
     private final com.chat.app.repository.MessageRevisionRepository messageRevisionRepository;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final com.chat.app.repository.UserBlockRepository userBlockRepository;
 
     public MessageService(
             MessageRepository messageRepository,
@@ -41,7 +42,8 @@ public class MessageService {
             com.chat.app.repository.MessageMentionRepository messageMentionRepository,
             com.chat.app.repository.PinnedMessageRepository pinnedMessageRepository,
             com.chat.app.repository.MessageRevisionRepository messageRevisionRepository,
-            @org.springframework.context.annotation.Lazy org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
+            @org.springframework.context.annotation.Lazy org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate,
+            com.chat.app.repository.UserBlockRepository userBlockRepository) {
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
         this.roomMemberRepository = roomMemberRepository;
@@ -51,6 +53,7 @@ public class MessageService {
         this.pinnedMessageRepository = pinnedMessageRepository;
         this.messageRevisionRepository = messageRevisionRepository;
         this.messagingTemplate = messagingTemplate;
+        this.userBlockRepository = userBlockRepository;
     }
 
     @Transactional
@@ -68,6 +71,19 @@ public class MessageService {
 
         if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), sender.getId())) {
             throw new AccessDeniedException("Cannot send message. You are not a member of this room.");
+        }
+
+        if (room.getRoomType() == com.chat.app.model.RoomType.DIRECT_MESSAGE) {
+            java.util.List<com.chat.app.model.RoomMember> members = roomMemberRepository.findByIdRoomId(room.getId());
+            for (com.chat.app.model.RoomMember member : members) {
+                if (!member.getUser().getId().equals(senderId)) {
+                    UUID otherUserId = member.getUser().getId();
+                    if (userBlockRepository.existsByUserIdAndBlockedUserId(senderId, otherUserId) ||
+                            userBlockRepository.existsByUserIdAndBlockedUserId(otherUserId, senderId)) {
+                        throw new AccessDeniedException("Cannot send message. You have blocked this user or they have blocked you.");
+                    }
+                }
+            }
         }
 
         Message parentMessage = null;
@@ -117,6 +133,11 @@ public class MessageService {
                 }
                 userRepository.findByUsername(username).ifPresent(targetUser -> {
                     if (roomMemberRepository.existsByIdRoomIdAndIdUserId(room.getId(), targetUser.getId())) {
+                        if (userBlockRepository.existsByUserIdAndBlockedUserId(sender.getId(), targetUser.getId()) ||
+                                userBlockRepository.existsByUserIdAndBlockedUserId(targetUser.getId(), sender.getId())) {
+                            return;
+                        }
+
                         com.chat.app.model.MessageMention mention = com.chat.app.model.MessageMention.builder()
                                 .message(savedMessage)
                                 .user(targetUser)
@@ -259,6 +280,14 @@ public class MessageService {
 
         // Sort messages by newest first
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        
+        java.util.List<UUID> blockedIds = new java.util.ArrayList<>();
+        blockedIds.addAll(userBlockRepository.findBlockedUserIds(userId));
+        blockedIds.addAll(userBlockRepository.findUsersWhoBlockedMe(userId));
+
+        if (!blockedIds.isEmpty()) {
+            return messageRepository.findByRoomIdAndSenderIdNotIn(roomId, blockedIds, pageRequest);
+        }
         return messageRepository.findByRoomId(roomId, pageRequest);
     }
 

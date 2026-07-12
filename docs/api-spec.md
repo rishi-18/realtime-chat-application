@@ -388,6 +388,49 @@ Retrieves all active pinned messages in a room.
     - `403 Forbidden`: `ACCESS_DENIED` (User is not a member of the room).
     - `404 Not Found`: `ROOM_NOT_FOUND` (Room does not exist).
 
+### Block User
+Blocks a user, preventing DMs and communication.
+*   **Route**: `POST /api/v1/users/block/{targetUserId}`
+*   **Authentication**: Required (Valid Access Token)
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "success": true,
+      "message": "User blocked successfully."
+    }
+    ```
+*   **Errors**:
+    - `400 Bad Request`: `BAD_REQUEST` (Cannot block yourself or user already blocked).
+
+### Unblock User
+Unblocks a blocked user.
+*   **Route**: `POST /api/v1/users/unblock/{targetUserId}`
+*   **Authentication**: Required (Valid Access Token)
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "success": true,
+      "message": "User unblocked successfully."
+    }
+    ```
+*   **Errors**:
+    - `400 Bad Request`: `BAD_REQUEST` (User is not blocked).
+
+### Fetch Blocked Users
+Retrieves the list of users blocked by the authenticated user.
+*   **Route**: `GET /api/v1/users/blocks`
+*   **Authentication**: Required (Valid Access Token)
+*   **Success Response (`200 OK`)**:
+    ```json
+    [
+      {
+        "id": "e3b0c442-9c0b-4ef8-bb6d-6bb9bd380a11",
+        "username": "blockeduser",
+        "email": "blocked@example.com"
+      }
+    ]
+    ```
+
 ---
 
 ## 2. WebSocket & STOMP Protocol Events

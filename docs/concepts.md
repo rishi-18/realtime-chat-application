@@ -454,3 +454,26 @@ WebSocket messages bypass standard servlet filters because they use persistent T
 *   We enforce limits by checking the user's token bucket inside a Spring `ChannelInterceptor` on `SEND` frames.
 *   If the user has exceeded their rate limit, the frame is dropped before it reaches the message controllers.
 *   The interceptor sends an error message back to the client over a dedicated websocket channel (`/queue/errors`).
+
+---
+
+## 23. User Blocks & Symmetrical Ignore Lists
+
+To prevent harassment and enforce user privacy, the chat platform implements a robust user blocking system.
+
+### 1. Symmetrical Blocking Logic
+When User A blocks User B:
+*   A bidirectional block relationship is enforced.
+*   User A cannot send messages to User B, and User B cannot send messages to User A.
+*   DMs between User A and User B cannot be created. If a DM room already exists between them, it is hidden from conversation list queries for both users.
+
+### 2. Message and Mention Interception
+*   When User A sends a message in a shared public or private group channel, and User B (who has blocked User A or is blocked by User A) is a member:
+    *   The message is still stored in the database so the channel history remains intact.
+    *   However, when rendering the message list or real-time event broadcasts for User B, the backend filters out messages sent by User A.
+    *   Similarly, User A cannot directly mention User B in group channels. Mention validation logic throws `AccessDeniedException` if a user attempts to mention someone they have blocked or who has blocked them.
+
+### 3. Composite Key Indexing
+Since checking block relationships happens frequently (during message queries, list renderings, and mentions):
+*   We enforce a unique database constraint on `(user_id, blocked_user_id)` to prevent duplicates.
+*   B-Tree indexes on `user_id` and `blocked_user_id` ensure fast block status lookups ($O(\log N)$).

@@ -69,5 +69,15 @@ public class DatabaseInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Could not run room invites schema migrations. Error: {}", e.getMessage());
         }
+
+        log.info("Checking user_blocks table and creating indexing...");
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS user_blocks (id UUID PRIMARY KEY, user_id UUID REFERENCES users(id) ON DELETE CASCADE, blocked_user_id UUID REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMP NOT NULL, UNIQUE(user_id, blocked_user_id))");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_user_blocks_user ON user_blocks(user_id)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_user_id)");
+            log.info("User blocks table schema and indexing configured successfully.");
+        } catch (Exception e) {
+            log.warn("Could not run user blocks schema migrations. Error: {}", e.getMessage());
+        }
     }
 }

@@ -39,6 +39,9 @@ class RoomServiceTest {
     @Mock
     private com.chat.app.repository.MessageRepository messageRepository;
 
+    @Mock
+    private com.chat.app.repository.UserBlockRepository userBlockRepository;
+
     @InjectMocks
     private RoomService roomService;
 
